@@ -1,5 +1,8 @@
 using CSharpWebsite;
+using CSharpWebsite.Content.Database;
 using Microsoft.Extensions.FileProviders;
+
+Controller.Init();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
@@ -21,9 +24,14 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAuthorization();
 
+#region Index
 app.MapGet("/",async (HttpContext context)=>{
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
 });
+app.MapPost("/", async (HttpContext context) => {
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+});
+#endregion
 
 #region QuoteController
 var quoteIndex = 0;
@@ -60,6 +68,25 @@ app.MapGet("/previousQuote", async (HttpContext context) =>
         return "Images/quotes/" + Path.GetFileName(file);
     }
     return "Images/quotes/fuckingledgend.png";
+});
+#endregion
+
+#region LoginHandler
+app.MapPost("/login", async (HttpContext context) =>
+{
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/login.html");
+});
+app.MapPost("/signUp", async (HttpContext context) =>
+{
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/signup.html");
+});
+app.MapGet("/submitLogin", async (HttpContext context) =>
+{
+
+});
+app.MapGet("/createAccount", async (HttpContext context) =>
+{
+
 });
 #endregion
 

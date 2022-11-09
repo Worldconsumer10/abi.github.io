@@ -15,20 +15,19 @@
             right: 0;
             margin-top: 0;
             margin-left: 0;
-            z-index: -1
+            z-index: 99
         }
         .TopBarElement {
             position: absolute;
-            z-index: 1;
-            margin-top: 25px;
-            margin-left: 25px;
+            z-index: 101;
+            top: 25px;
+            right: 25px;
             user-select: none;
         }
         .TopBarButton {
             position: absolute;
-            z-index: 1;
-            margin-top: 25px;
-            margin-left: 25px;
+            z-index: 101;
+            top:30px;
             user-select: none;
             cursor: pointer;
         }
@@ -41,6 +40,8 @@
         }
         div.container {
             display: inline-block;
+            min-width:10vw;
+            max-width:90vw
         }
         p {
             text-align: center;
@@ -51,7 +52,9 @@
     <div class="TopBar">
     </div>
     <!--#region Label Buttons-->
-    <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" class="TopBarButton" onclick="TestRedirect(this)">Test Label</label>
+    <div class="TopBarElement" style="right: 25px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
+        <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="Login(this)">Login</label>
+    </div>
     <!--#endregion -->
     <!--#region Quotes Buttons-->
     <div class="alignCenter">
@@ -59,7 +62,7 @@
             <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/leftarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Previous()" height="100vw" width="100vw" />
         </div>
         <div class="container">
-            <img class="middle-img" id="quoteImage" style="user-select:none;" src="Images/quotes/quote1.png" height="100vw" width="auto" />
+            <img class="middle-img" id="quoteImage" style="user-select: none; max-width: 80vw; min-width: 30vw; min-height: 30vh; max-height: 60vh" src="Images/quotes/quote1.png" height="100vw" width="auto" />
         </div>
         <div class="container">
             <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/rightarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Next()" height="100vw" width="100vw" />
@@ -78,11 +81,11 @@
             for (i in elements) {
                 var element = elements[i]
                 if (element != null) {
-                    if (elements[i].id == "label") {
+                    if (element.id == "label") {
                         element.onmouseover = function () { MouseOverLabel(element) }
                         element.onmouseout = function () { MouseLeftLabel(element) }
                         element.onclick = function () { TestRedirect(element) }
-                    } else {
+                    } else if(element.id == "arrow") {
                         element.onmouseover = function () { FadeArrow(element) }
                         element.onmouseout = function () { BrightenArrow(element) }
                     }
@@ -155,8 +158,8 @@
             console.log("No Longer Hovering over label")
         }
         //unique button functions
-        function TestRedirect(element) {
-            SendHTTPPost("/Test")
+        function Login(element) {
+            SendHTTPPost("/login")
         }
     </script>
 </body>
