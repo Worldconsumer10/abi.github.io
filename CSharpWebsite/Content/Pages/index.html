@@ -1,0 +1,163 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <link rel="icon" type="image/x-icon" href="Images/favicon.ico">
+    <meta charset="utf-8" />
+    <title>Test Page</title>
+    <style>
+        .TopBar {
+            position: absolute;
+            width: 100vw;
+            height: 75px;
+            background-color: black;
+            left: 0;
+            top: 0;
+            right: 0;
+            margin-top: 0;
+            margin-left: 0;
+            z-index: -1
+        }
+        .TopBarElement {
+            position: absolute;
+            z-index: 1;
+            margin-top: 25px;
+            margin-left: 25px;
+            user-select: none;
+        }
+        .TopBarButton {
+            position: absolute;
+            z-index: 1;
+            margin-top: 25px;
+            margin-left: 25px;
+            user-select: none;
+            cursor: pointer;
+        }
+        .alignCenter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            min-height: 100vh;
+        }
+        div.container {
+            display: inline-block;
+        }
+        p {
+            text-align: center;
+        }
+    </style>
+</head>
+<body style="background-color:rgb(50,50,50); color:white">
+    <div class="TopBar">
+    </div>
+    <!--#region Label Buttons-->
+    <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" class="TopBarButton" onclick="TestRedirect(this)">Test Label</label>
+    <!--#endregion -->
+    <!--#region Quotes Buttons-->
+    <div class="alignCenter">
+        <div class="container">
+            <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/leftarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Previous()" height="100vw" width="100vw" />
+        </div>
+        <div class="container">
+            <img class="middle-img" id="quoteImage" style="user-select:none;" src="Images/quotes/quote1.png" height="100vw" width="auto" />
+        </div>
+        <div class="container">
+            <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/rightarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Next()" height="100vw" width="100vw" />
+        </div>
+    </div>
+    <!--#endregion-->
+    <script language="javascript">
+        var initColor = document.body.style.color
+        onload = async () => {
+            var newquote = await SendHTTPGet("/randomizeQuote")
+            if (newquote != undefined) {
+                var element = document.getElementById("quoteImage")
+                element.setAttribute("src", newquote)
+            }
+            var elements = document.getElementsByTagName("button")
+            for (i in elements) {
+                var element = elements[i]
+                if (element != null) {
+                    if (elements[i].id == "label") {
+                        element.onmouseover = function () { MouseOverLabel(element) }
+                        element.onmouseout = function () { MouseLeftLabel(element) }
+                        element.onclick = function () { TestRedirect(element) }
+                    } else {
+                        element.onmouseover = function () { FadeArrow(element) }
+                        element.onmouseout = function () { BrightenArrow(element) }
+                    }
+                }
+            }
+        }
+        async function Next() {
+            var newquote = await SendHTTPGet("/nextQuote")
+            if (newquote != undefined) {
+                var element = document.getElementById("quoteImage")
+                element.setAttribute("src", newquote)
+            }
+        }
+        async function Previous() {
+            var newquote = await SendHTTPGet("/previousQuote")
+            if (newquote != undefined) {
+                var element = document.getElementById("quoteImage")
+                element.setAttribute("src", newquote)
+            }
+        }
+        function FadeArrow(element) {
+            element.setAttribute("style", "filter:brightness(75%);user-select: none;cursor: pointer;")
+        }
+        function BrightenArrow(element) {
+            element.setAttribute("style", "filter:brightness(100%);user-select: none;cursor: pointer;")
+        }
+        function SendHTTPGet(connection, content) {
+            return new Promise((resolve, reject) => {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = () => {
+                    if (xhr.readyState == 4 && xhr.status == 200) {
+                        resolve(xhr.responseText);
+                        return;
+                    }
+                }
+                xhr.open('get', connection, true);
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+                if (cont != undefined) {
+                    var cont = content
+                    if (typeof content == "object") { cont = JSON.stringify(content) }
+                    xhr.send(cont);
+                } else { xhr.send(); }
+            })
+        }
+        function SendHTTPPost(connection, content) {
+            var fm = document.createElement("form")
+            fm.setAttribute("method", "post")
+            fm.setAttribute("action", connection)
+            if (content != undefined) {
+                var d = document.createElement("input")
+                d.setAttribute("type", "text")
+                d.setAttribute("id", "data")
+                var cont = content
+                if (typeof content == "object") { cont = JSON.stringify(content) }
+                d.setAttribute("value", cont)
+                fm.appendChild(d);
+                document.body.appendChild(fm)
+                fm.submit();
+                d.remove();
+            } else { document.body.appendChild(fm); fm.submit(); }
+            fm.remove()
+        }
+        //controls general functions like labels graying out
+        function MouseOverLabel(element) {
+            element.style = "color:gray"
+            console.log("Hovering over label")
+        }
+        function MouseLeftLabel(element) {
+            element.style = `color:${initColor}`
+            console.log("No Longer Hovering over label")
+        }
+        //unique button functions
+        function TestRedirect(element) {
+            SendHTTPPost("/Test")
+        }
+    </script>
+</body>
+</html>
