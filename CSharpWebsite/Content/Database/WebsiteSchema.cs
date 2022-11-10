@@ -7,34 +7,55 @@ namespace CSharpWebsite.Content.Database
     {
         [BsonId]
         public int _id { get; set; } = new Random().Next(int.MinValue, int.MaxValue);
-        public string Email { get; set; } = "TestUsername";
-        public string Password { get; set; } = "e193asf=-=1";
+        public List<string> Email { get; set; } = new List<string>();
+        public List<string> Password { get; set; } = new List<string>();
+        public List<string> EnryptionKey { get; set; } = new List<string>();
         public int PermissionLevel { get; set; } = 0;
         public int LoginAttempts { get; set; } = 0;
         public bool IsLocked { get; set; } = false;
         public bool IsPaired { get; set; } = false;
-        public ulong DiscordId { get; set; } = 0;
+        public ulong? DiscordId { get; set; } = null;
         public static async Task<WebsiteSchema?> Get(string email)
         {
             try
             {
-                var db = Controller.database;
+                IMongoDatabase db = Controller.database;
                 IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                return (WebsiteSchema?)await collection.FindAsync(d => d.Email == email);
+                WebsiteSchema? item = null;
+                foreach (var entry in await GetAll())
+                {
+                    Console.WriteLine($"Email: {DecryptEmail(entry)}");
+                    if (DecryptEmail(entry).ToLower() == email.ToLower()) { item = entry; break; }
+                    continue;
+                }
+                return item;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                Console.WriteLine(ex.Message);
                 await Task.Delay(100);
                 return await Get(email);
             }
         }
-        public static async Task<List<WebsiteSchema?>> GetAll()
+        public static string DecryptEmail(WebsiteSchema data)
+        {
+            try
+            {
+                return DataEncryption.Decrypt(data.Email, data.EnryptionKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{ex.Message}\n{ex.InnerException}\n\n{ex.StackTrace}");
+                return "An Error Occured";
+            }
+        }
+        public static async Task<List<WebsiteSchema>> GetAll()
         {
             try
             {
                 var db = Controller.database;
                 IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                return (List<WebsiteSchema?>)await collection.FindAsync(_ => true);
+                return collection.Find(_ => true).ToList();
             }
             catch (Exception)
             {
@@ -48,11 +69,11 @@ namespace CSharpWebsite.Content.Database
             {
                 var db = Controller.database;
                 IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                var count = (await collection.FindAsync(_=>true)).ToList().Count;
+                var count = (await collection.FindAsync(_ => true)).ToList().Count;
                 await collection.InsertOneAsync(this);
-                return count > (await collection.FindAsync(_ => true)).ToList().Count;
+                return !(count > (await collection.FindAsync(_ => true)).ToList().Count);
             }
-            catch(Exception)
+            catch (Exception)
             {
                 await Task.Delay(100);
                 return await Upload();

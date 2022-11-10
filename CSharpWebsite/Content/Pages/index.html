@@ -46,6 +46,38 @@
         p {
             text-align: center;
         }
+        .alignContentCenter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .inputTab {
+            border: double;
+            border-color: red;
+            border-spacing: 20px 100px;
+            border-radius: 6px 8px
+        }
+        .show{
+            opacity:1;
+            animation: fadeIn 0.3s linear;
+        }
+        .hide {
+            opacity: 0;
+            animation: fadeOut 0.3s linear;
+        }
+        @keyframes fadeIn{
+            0% {opacity:0}
+            100% {opacity:1}
+        }
+        @keyframes fadeOut {
+            0% {
+                opacity: 1
+            }
+
+            100% {
+                opacity: 0
+            }
+        }
     </style>
 </head>
 <body style="background-color:rgb(50,50,50); color:white">
@@ -53,7 +85,7 @@
     </div>
     <!--#region Label Buttons-->
     <div class="TopBarElement" style="right: 25px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
-        <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="Login(this)">Login</label>
+        <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
     </div>
     <!--#endregion -->
     <!--#region Quotes Buttons-->
@@ -62,11 +94,45 @@
             <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/leftarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Previous()" height="100vw" width="100vw" />
         </div>
         <div class="container">
-            <img class="middle-img" id="quoteImage" style="user-select: none; max-width: 80vw; min-width: 30vw; min-height: 30vh; max-height: 60vh" src="Images/quotes/quote1.png" height="100vw" width="auto" />
+            <img class="middle-img" id="quoteImage" style="user-select: none;cursor: pointer; max-width: 80vw; min-width: 30vw; min-height: 30vh; max-height: 60vh" src="Images/quotes/quote1.png" height="100vw" width="auto" />
         </div>
         <div class="container">
             <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="Images/siteassets/rightarrow.png" style="filter: brightness(100%); user-select: none; cursor: pointer;" onclick="Next()" height="100vw" width="100vw" />
         </div>
+    </div>
+    <!--#endregion-->
+    <!--#region Login-->
+    <div id="LoginTab" style="opacity:1;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 200px; position: absolute">
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseLogin(this)" />
+        <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:200">
+            <form style="text-align:center">
+                <input class="inputTab" type="email" name="Email" />
+                <br />
+                <input class="inputTab" type="password" name="Password" />
+                <p></p>
+                <input type="button" onclick="SubmitLogin(this.parentNode)" value="Log In" />
+                <br />
+                <input type="button" onclick="StartSignup(this)" value="Sign Up" />
+                <br />
+                <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred">Invalid Login</label>
+            </form>
+        </fieldset>
+    </div>
+    <!--#endregion-->
+    <!--#region Register-->
+    <div id="RegisterTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 175px; position: absolute">
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseRegister(this)" />
+        <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:201">
+            <form style="text-align:center">
+                <input class="inputTab" type="email" name="Email" />
+                <br />
+                <input class="inputTab" type="password" name="Password" />
+                <p></p>
+                <input type="button" value="Sign Up" onclick="SubmitSignup(this.parentNode)" />
+                <br />
+                <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred">Invalid Login</label>
+            </form>
+        </fieldset>
     </div>
     <!--#endregion-->
     <script language="javascript">
@@ -85,7 +151,7 @@
                         element.onmouseover = function () { MouseOverLabel(element) }
                         element.onmouseout = function () { MouseLeftLabel(element) }
                         element.onclick = function () { TestRedirect(element) }
-                    } else if(element.id == "arrow") {
+                    } else if (element.id == "arrow") {
                         element.onmouseover = function () { FadeArrow(element) }
                         element.onmouseout = function () { BrightenArrow(element) }
                     }
@@ -107,15 +173,20 @@
             }
         }
         function FadeArrow(element) {
-            element.setAttribute("style", "filter:brightness(75%);user-select: none;cursor: pointer;")
+            if (element.style != null) {
+                element.style.filter = "brightness(75%)"
+            }
         }
         function BrightenArrow(element) {
-            element.setAttribute("style", "filter:brightness(100%);user-select: none;cursor: pointer;")
+            if (element.style != null) {
+                element.style.filter = "brightness(100%)"
+            }
         }
         function SendHTTPGet(connection, content) {
             return new Promise((resolve, reject) => {
                 var xhr = new XMLHttpRequest();
                 xhr.onreadystatechange = () => {
+                    console.log(xhr)
                     if (xhr.readyState == 4 && xhr.status == 200) {
                         resolve(xhr.responseText);
                         return;
@@ -150,16 +221,97 @@
         }
         //controls general functions like labels graying out
         function MouseOverLabel(element) {
-            element.style = "color:gray"
-            console.log("Hovering over label")
+            if (element.style != undefined) {
+                element.style.color = "gray"
+            }
         }
         function MouseLeftLabel(element) {
-            element.style = `color:${initColor}`
-            console.log("No Longer Hovering over label")
+            if (element.style != undefined) {
+                element.style.color = "white"
+            }
         }
         //unique button functions
-        function Login(element) {
-            SendHTTPPost("/login")
+        function StartSignup(element) {
+            element = document.getElementById("LoginTab")
+            CloseLogin(element)
+            OpenRegister(element)
+        }
+        async function SubmitSignup(element) {
+            var email = element[0].value
+            if (email == "") { email = "None"; }
+            var password = element[1].value
+            if (password == "") { password = "None"; }
+            element.lastElementChild.style.opacity = 0;
+            element.lastElementChild.className = "hide"
+            element.lastElementChild.setAttribute("hidden", "true")
+            element.parentNode.parentNode.style.height = "200px";
+            console.log("Sending Creation Request");
+            var result = await SendHTTPGet(`/createAccount?email=${email}&password=${password}`)
+            console.log("Recieved Response");
+            if (isJson(result)) {
+                var result = JSON.parse(result)
+                sessionStorage.setItem("Login", result)
+            } else {
+                var state = result.split("]")[0].split("[")[1]
+                console.log(state)
+                console.log(result)
+                element.lastElementChild.removeAttribute("hidden")
+                element.lastElementChild.style.opacity = 1;
+                element.lastElementChild.className = "show"
+                element.parentNode.parentNode.style.height = "210px";
+                element.lastElementChild.innerText = result.split("] ").splice(1)
+            }
+        }
+        async function SubmitLogin(element) {
+            var email = element[0].value
+            if (email == "") { email = "None"; }
+            var password = element[1].value
+            if (password == "") { password = "None"; }
+            element.lastElementChild.style.opacity = 0;
+            element.lastElementChild.className = "hide"
+            element.lastElementChild.setAttribute("hidden","true")
+            element.parentNode.parentNode.style.height = "200px";
+            var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`)
+            if (isJson(result)) {
+                var result = JSON.parse(result)
+                sessionStorage.setItem("Login", result)
+            } else {
+                console.log(result)
+                element.lastElementChild.removeAttribute("hidden")
+                element.lastElementChild.style.opacity = 1;
+                element.lastElementChild.className = "show"
+                element.parentNode.parentNode.style.height = "210px";
+                element.lastElementChild.innerText = result
+            }
+        }
+        function isJson(str) {
+            try {
+                JSON.parse(str);
+            } catch (e) {
+                return false;
+            }
+            return true;
+        }
+
+        function OpenLogin(element) {
+            element = document.getElementById("LoginTab")
+            element.className = "show";
+            element.style.opacity = 1;
+        }
+        function CloseLogin(element) {
+            element = document.getElementById("LoginTab")
+            element.className = "hide";
+            element.style.opacity = 0;
+        }
+        function OpenRegister(element) {
+            element = document.getElementById("RegisterTab")
+            element.className = "show";
+            element.style.opacity = 1;
+        }
+        function CloseRegister(element) {
+            element = document.getElementById("RegisterTab")
+            element.className = "hide";
+            element.style.opacity = 0;
         }
     </script>
 </body>
