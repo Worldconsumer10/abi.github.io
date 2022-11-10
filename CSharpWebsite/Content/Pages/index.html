@@ -49,13 +49,17 @@
         .alignContentCenter {
             display: flex;
             justify-content: center;
-            align-items: center;
+            align-items:center;
         }
         .inputTab {
             border: double;
             border-color: red;
             border-spacing: 20px 100px;
             border-radius: 6px 8px
+        }
+        .profileElement{
+            font-size:30px;
+            font:bold;
         }
         .show{
             opacity:1;
@@ -85,7 +89,7 @@
     </div>
     <!--#region Label Buttons-->
     <div class="TopBarElement" style="right: 25px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
-        <label tag="button" id="label" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
+        <label tag="button" id="loginButton" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
     </div>
     <!--#endregion -->
     <!--#region Quotes Buttons-->
@@ -102,7 +106,7 @@
     </div>
     <!--#endregion-->
     <!--#region Login-->
-    <div id="LoginTab" style="opacity:1;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 200px; position: absolute">
+    <div id="LoginTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 200px; position: absolute">
         <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseLogin(this)" />
         <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:200">
             <form style="text-align:center">
@@ -130,7 +134,7 @@
                 <p></p>
                 <input type="button" value="Sign Up" onclick="SubmitSignup(this.parentNode)" />
                 <br />
-                <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred">Invalid Login</label>
+                <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred;">Invalid Login</label>
             </form>
         </fieldset>
     </div>
@@ -157,6 +161,26 @@
                     }
                 }
             }
+            var storage = sessionStorage.getItem("SessionDetails")
+            if (storage != null) {
+                var login = document.getElementById("loginButton")
+                login.onclick = function () { OpenProfile(element); }
+                login.innerText = "Profile"
+                var protab = document.getElementById("ProfileTab")
+                var datagroup = protab.lastElementChild.firstElementChild;
+                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                if (json != null) {
+                    datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
+                }
+            }
+            setInterval(() => {
+                if (sessionStorage.getItem("SessionDetails") != undefined) {
+                    var move = SendHTTPGet(`/verifyLogin?json=${sessionStorage.getItem("SessionDetails")}`)
+                    if (move=="InvalidMove") {
+                        document.URL = location.origin+"/banned"
+                    }
+                }
+            },1000)
         }
         async function Next() {
             var newquote = await SendHTTPGet("/nextQuote")
@@ -186,9 +210,8 @@
             return new Promise((resolve, reject) => {
                 var xhr = new XMLHttpRequest();
                 xhr.onreadystatechange = () => {
-                    console.log(xhr)
                     if (xhr.readyState == 4 && xhr.status == 200) {
-                        resolve(xhr.responseText);
+                        resolve(xhr.responseText)
                         return;
                     }
                 }
@@ -253,13 +276,19 @@
                 sessionStorage.setItem("Login", result)
             } else {
                 var state = result.split("]")[0].split("[")[1]
-                console.log(state)
-                console.log(result)
+                var message = result.split(")")[0].split("(")[1]
+                if (state == "Success") {
+                    element.lastElementChild.style.color = "lime"
+                    element.lastElementChild.style["text-shadow"] = "0.5px 0.5px green";
+                } else {
+                    element.lastElementChild.style.color = "red"
+                    element.lastElementChild.style["text-shadow"] = "0.5px 0.5px darkred";
+                }
                 element.lastElementChild.removeAttribute("hidden")
                 element.lastElementChild.style.opacity = 1;
                 element.lastElementChild.className = "show"
                 element.parentNode.parentNode.style.height = "210px";
-                element.lastElementChild.innerText = result.split("] ").splice(1)
+                element.lastElementChild.innerText = message
             }
         }
         async function SubmitLogin(element) {
@@ -269,19 +298,42 @@
             if (password == "") { password = "None"; }
             element.lastElementChild.style.opacity = 0;
             element.lastElementChild.className = "hide"
-            element.lastElementChild.setAttribute("hidden","true")
+            element.lastElementChild.setAttribute("hidden", "true")
             element.parentNode.parentNode.style.height = "200px";
             var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`)
-            if (isJson(result)) {
-                var result = JSON.parse(result)
-                sessionStorage.setItem("Login", result)
-            } else {
-                console.log(result)
+            var json = result.split(") ")[1]
+            if (isJson(json)) {
+                var jsonResult = JSON.parse(json)
+                console.log("[INFO] This is a note for all you wannabe-hackers.. i stored the logged in email address in the sessionStorage. Fuck around with this as much as you like it will be verified server-side anyway. Also dont modify it. This verification can have your account banned if you modified the sessionStorage")
+                sessionStorage.setItem("SessionDetails", json)
+                console.log(jsonResult)
+            }
+            var state = result.split("]")[0].split("[")[1]
+            var message = result.split(")")[0].split("(")[1]
+            if (state == "Success") {
+                element.lastElementChild.style.color = "lime"
+                element.lastElementChild.style["text-shadow"] = "0.5px 0.5px green";
                 element.lastElementChild.removeAttribute("hidden")
                 element.lastElementChild.style.opacity = 1;
                 element.lastElementChild.className = "show"
                 element.parentNode.parentNode.style.height = "210px";
-                element.lastElementChild.innerText = result
+                element.lastElementChild.innerText = message
+                setTimeout(() => {
+                    CloseLogin(element)
+                    CloseRegister(element)
+                    var login = document.getElementById("loginButton")
+                    login.onclick = function () { OpenProfile(element); }
+                    login.innerText = "Profile"
+                    var protab = document.getElementById("ProfileTab")
+                    var datagroup = protab.lastElementChild.firstElementChild;
+                    var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                    if (json != null) {
+                        datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
+                    }
+                }, 1000)
+            } else {
+                element.lastElementChild.style.color = "red"
+                element.lastElementChild.style["text-shadow"] = "0.5px 0.5px darkred";
             }
         }
         function isJson(str) {
@@ -303,6 +355,16 @@
             element.className = "hide";
             element.style.opacity = 0;
         }
+        function OpenProfile(element) {
+            element = document.getElementById("ProfileTab")
+            element.className = "show";
+            element.style.opacity = 1;
+        }
+        function CloseProfile(element) {
+            element = document.getElementById("ProfileTab")
+            element.className = "hide";
+            element.style.opacity = 0;
+        }
         function OpenRegister(element) {
             element = document.getElementById("RegisterTab")
             element.className = "show";
@@ -314,5 +376,19 @@
             element.style.opacity = 0;
         }
     </script>
+    <!--#region Profile-->
+    <div id="ProfileTab" style="opacity:1;top: 35vh; left: 15vw; border-radius: 10px; border: solid gray; background-color: gray; width: 963px; height: 300px; position: absolute">
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseProfile(this)" />
+        <fieldset style="display: flex; justify-content:center; text-align:center; border: solid 10px; border-radius: 5px; border-color: cyan; border-spacing: 20px 100px; width: 950px; height: 210px; min-width: 150px; left: 30px; top: 30px; max-width: 840px; position: absolute; z-index: 200">
+            <div>
+                <img src="Images/unknownprofliepic.png" style="width:auto;height:40%"/>
+                <p></p>
+                <label class="profileElement">Email: None</label>
+                <br />
+                <label class="profileElement" name="DiscordNPaired">Discord Is Not Paired</label>
+            </div>
+        </fieldset>
+    </div>
+    <!--#endregion-->
 </body>
 </html>
