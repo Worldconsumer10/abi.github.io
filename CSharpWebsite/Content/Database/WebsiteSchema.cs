@@ -12,8 +12,10 @@ namespace CSharpWebsite.Content.Database
         public List<string> EnryptionKey { get; set; } = new List<string>();
         public int PermissionLevel { get; set; } = 0;
         public int LoginAttempts { get; set; } = 0;
+        public string URLThumbnail { get; set; } = string.Empty;
         public bool IsLocked { get; set; } = false;
         public bool IsPaired { get; set; } = false;
+        public bool IsBanned { get; set; } = false;
         public ulong? DiscordId { get; set; } = null;
         public static async Task<WebsiteSchema?> Get(string email)
         {
@@ -24,7 +26,6 @@ namespace CSharpWebsite.Content.Database
                 WebsiteSchema? item = null;
                 foreach (var entry in await GetAll())
                 {
-                    Console.WriteLine($"Email: {DecryptEmail(entry)}");
                     if (DecryptEmail(entry).ToLower() == email.ToLower()) { item = entry; break; }
                     continue;
                 }

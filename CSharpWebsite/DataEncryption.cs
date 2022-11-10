@@ -6,7 +6,7 @@ namespace CSharpWebsite
 {
     internal class DataEncryption
     {
-        private static string SecretKey { get; } = "141jjabfa-=1053";
+        private static string SecretKey { get; } = Environment.GetEnvironmentVariable("WebsiteSecretKey",EnvironmentVariableTarget.Machine)??"ea4309d";
         internal static List<string> Encrypt(string text, List<string> keys)
         {
             List<string> encrypted = new List<string>();
@@ -48,7 +48,7 @@ namespace CSharpWebsite
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
 
-                aes.Key = encoding.GetBytes(key);
+                aes.Key = encoding.GetBytes(key+SecretKey);
                 aes.GenerateIV();
 
                 ICryptoTransform AESEncrypt = aes.CreateEncryptor(aes.Key, aes.IV);
@@ -73,7 +73,7 @@ namespace CSharpWebsite
             }
             catch (Exception e)
             {
-                throw new Exception("Error encrypting: " + e.Message);
+                throw new Exception($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
             }
         }
 
@@ -86,7 +86,7 @@ namespace CSharpWebsite
                 aes.BlockSize = 128;
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
-                aes.Key = encoding.GetBytes(key);
+                aes.Key = encoding.GetBytes(key + SecretKey);
 
                 // Base 64 decode
                 byte[] base64Decoded = Convert.FromBase64String(plainText);
@@ -96,16 +96,16 @@ namespace CSharpWebsite
                 JavaScriptSerializer ser = new JavaScriptSerializer();
                 var payload = ser.Deserialize<Dictionary<string, string>>(base64DecodedStr);
 
-                aes.IV = Convert.FromBase64String(payload["iv"]);
+                aes.IV = Convert.FromBase64String(payload["Iv"]);
 
                 ICryptoTransform AESDecrypt = aes.CreateDecryptor(aes.Key, aes.IV);
-                byte[] buffer = Convert.FromBase64String(payload["value"]);
+                byte[] buffer = Convert.FromBase64String(payload["Value"]);
 
                 return encoding.GetString(AESDecrypt.TransformFinalBlock(buffer, 0, buffer.Length));
             }
             catch (Exception e)
             {
-                throw new Exception("Error decrypting: " + e.Message);
+                throw new Exception($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
             }
         }
 
@@ -123,7 +123,7 @@ namespace CSharpWebsite
             var key = "";
             for (int ci = 0; ci < key_count; ci++)
             {
-                for (int i = 0; i < 32; i++)
+                for (int i = 0; i < 32-SecretKey.Length; i++)
                 {
                     key += chars[new Random().Next(chars.Length)];
                 }
