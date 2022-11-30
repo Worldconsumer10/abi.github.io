@@ -1,6 +1,7 @@
 ﻿using Nancy.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace CSharpWebsite
 {
@@ -93,13 +94,13 @@ namespace CSharpWebsite
                 string base64DecodedStr = encoding.GetString(base64Decoded);
 
                 // JSON Decode base64Str
-                JavaScriptSerializer ser = new JavaScriptSerializer();
-                var payload = ser.Deserialize<Dictionary<string, string>>(base64DecodedStr);
 
-                aes.IV = Convert.FromBase64String(payload["Iv"]);
+                var payload = JsonSerializer.Deserialize<Dictionary<string, string>>(base64DecodedStr) ?? new Dictionary<string, string>();
+
+                aes.IV = Convert.FromBase64String(payload["iv"]);
 
                 ICryptoTransform AESDecrypt = aes.CreateDecryptor(aes.Key, aes.IV);
-                byte[] buffer = Convert.FromBase64String(payload["Value"]);
+                byte[] buffer = Convert.FromBase64String(payload["value"]);
 
                 return encoding.GetString(AESDecrypt.TransformFinalBlock(buffer, 0, buffer.Length));
             }
@@ -115,6 +116,22 @@ namespace CSharpWebsite
             {
                 return hmac.ComputeHash(encoding.GetBytes(data));
             }
+        }
+        internal static List<string> GetRandomString(int string_count,int string_length = 5)
+        {
+            string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+            List<string> allkeys = new List<string>();
+            var key = "";
+            for (int ci = 0; ci < string_count; ci++)
+            {
+                for (int i = 0; i < string_length; i++)
+                {
+                    key += chars[new Random().Next(chars.Length)];
+                }
+                allkeys.Add(key);
+                key = "";
+            }
+            return allkeys;
         }
         internal static List<string> RandomKeyString(int key_count)
         {

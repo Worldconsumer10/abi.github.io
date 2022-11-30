@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="icon" type="image/x-icon" href="Images/favicon.ico">
+        <meta charset="utf-8" />
+        <title>Test Page</title>
+        <style>
+            .TopBar {
+                position: absolute;
+                width: 100vw;
+                height: 75px;
+                background-color: black;
+                left: 0;
+                top: 0;
+                right: 0;
+                margin-top: 0;
+                margin-left: 0;
+                z-index: 99
+            }
+
+            .TopBarElement {
+                position: absolute;
+                z-index: 101;
+                top: 25px;
+                right: 25px;
+                user-select: none;
+            }
+
+            .TopBarButton {
+                position: absolute;
+                z-index: 101;
+                top: 30px;
+                user-select: none;
+                cursor: pointer;
+            }
+
+            .alignCenter {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                text-align: center;
+                min-height: 100vh;
+            }
+
+            div.container {
+                display: inline-block;
+                min-width: 10vw;
+                max-width: 90vw
+            }
+
+            p {
+                text-align: center;
+            }
+
+            .alignContentCenter {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+
+            .inputTab {
+                border: double;
+                border-color: red;
+                border-spacing: 20px 100px;
+                border-radius: 6px 8px
+            }
+
+            .profileElement {
+                font-size: 30px;
+                font: bold;
+            }
+
+            .show {
+                opacity: 1;
+                animation: fadeIn 0.3s linear;
+            }
+
+            .hide {
+                opacity: 0;
+                animation: fadeOut 0.3s linear;
+            }
+
+            @keyframes fadeIn {
+                0% {
+                    opacity: 0
+                }
+
+                100% {
+                    opacity: 1
+                }
+            }
+
+            @keyframes fadeOut {
+                0% {
+                    opacity: 1
+                }
+
+                100% {
+                    opacity: 0
+                }
+            }
+        </style>
+    </head>
+    <body style="background-color:rgb(50,50,50); color:white">
+        <div class="TopBar">
+        </div>
+        <script>
+            function SendHTTPGet(connection, content) {
+                return new Promise((resolve, reject) => {
+                    var xhr = new XMLHttpRequest();
+                    xhr.onreadystatechange = () => {
+                        if (xhr.readyState == 4 && xhr.status == 200) {
+                            resolve(xhr.responseText)
+                            return;
+                        }
+                    }
+                    xhr.open('get', connection, true);
+                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+                    if (content != undefined) {
+                        var cont = content
+                        if (typeof content == "object") { cont = JSON.stringify(content) }
+                        xhr.send(cont);
+                    } else { xhr.send(); }
+                })
+            }
+            function SendHTTPPost(connection, content) {
+                var fm = document.createElement("form")
+                fm.setAttribute("method", "post")
+                fm.setAttribute("action", connection)
+                if (content != undefined) {
+                    var d = document.createElement("input")
+                    d.setAttribute("type", "text")
+                    d.setAttribute("id", "data")
+                    var cont = content
+                    if (typeof content == "object") { cont = JSON.stringify(content) }
+                    d.setAttribute("value", cont)
+                    fm.appendChild(d);
+                    document.body.appendChild(fm)
+                    fm.submit();
+                    d.remove();
+                } else { document.body.appendChild(fm); fm.submit(); }
+                fm.remove()
+            }
+            onload = async function () {
+                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                var response = await SendHTTPGet(`/requestServers?email=${json.email ?? "none"}&id=${json.sessionId ?? 0}`);
+                var json = JSON.parse(response);
+                if (json == null) return;
+                console.log(json)
+            }
+        </script>
+    </body>
+</html>

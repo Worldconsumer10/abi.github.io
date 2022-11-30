@@ -2,7 +2,11 @@ using CSharpWebsite;
 using CSharpWebsite.Content.Database;
 using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.FileProviders;
+using System.Net.Mail;
+using System.Net;
+using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
+using System.Collections;
 
 Controller.Init();
 
@@ -76,7 +80,11 @@ app.MapGet("/previousQuote", async (HttpContext context) =>
     var files = Directory.GetFiles(Path.Combine(Environment.CurrentDirectory, "Content/ImageAssets/quotes"));
     quoteIndex--;
     if (quoteIndex < 0) { quoteIndex = files.Length; }
-    var file = files[quoteIndex];
+    var file = files[0];
+    try
+    {
+        file = files[quoteIndex];
+    } catch (Exception) { }
     if (file != null)
     {
         return "Images/quotes/" + Path.GetFileName(file);
@@ -98,9 +106,27 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     if (getUser == null) { await context.Response.WriteAsync("[Failure] (Not Registered)"); return; }
     if (getUser.IsLocked) { await context.Response.WriteAsync("[Failure] (Account Locked!)"); return; }
     if (getUser.IsBanned) { await context.Response.WriteAsync("[Failure] (Account Banned!)"); return; }
+    if (getUser.lockDate != DateTime.MaxValue) { await context.Response.WriteAsync("[Failure] (Account Locked! Try Again Later!)"); return; }
     var decryptedEmail = DataEncryption.Decrypt(getUser.Email, getUser.EnryptionKey);
     var decryptPassword = DataEncryption.Decrypt(getUser.Password, getUser.EnryptionKey);
-    if (decryptPassword != password) { await context.Response.WriteAsync("[Failure] (Incorrect Password)"); return; }
+    if (decryptPassword != password) {
+        if (getUser.lockRetries <= 0)
+        {
+            var keys = DataEncryption.GetRandomString(5);
+            getUser.resetCode = keys[new Random().Next(keys.Count)];
+            sendResetEmail(email, getUser.resetCode);
+            await context.Response.WriteAsync($"[Failure] (Incorrect Password. Resending Confirmation Email)");
+        } else
+        {
+            getUser.lockRetries--;
+            var keys = DataEncryption.GetRandomString(5);
+            getUser.resetCode = keys[new Random().Next(keys.Count)];
+            sendResetEmail(email, getUser.resetCode);
+            await context.Response.WriteAsync($"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
+        }
+        await getUser.Update();
+        return; 
+    }
     var userIndex = new Random().Next(int.MinValue, int.MaxValue);
     if (!ServerStorage.Any(s => s.Item2.ToLower() == decryptedEmail.ToLower()))
     {
@@ -109,9 +135,88 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     {
         ServerStorage[ServerStorage.FindIndex(s => s.Item2.ToLower() == decryptedEmail.ToLower())] = Tuple.Create(userIndex, decryptedEmail);
     }
-    await context.Response.WriteAsync("[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail,sessionId= userIndex,URLThumbnail=getUser.URLThumbnail }));
+    var highestpermlist = getUser.permissionLevel;
+    highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
+    var highestperm = 0;
+    if (highestpermlist.Count > 0)
+    {
+        highestperm = highestpermlist[0].userLevel;
+    }
+    await context.Response.WriteAsync("[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail,sessionId= userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
 });
+app.MapGet("/emailverification", async (HttpContext context, string code) =>
+{
+    var user = (await WebsiteSchema.GetAll()).Find(c => c.resetCode == code);
+    if (user == null) { await context.Response.WriteAsync("[Failure] Invalid Code"); return; }
+    user.lockDate = DateTime.MaxValue;
+    user.lockRetries = 3;
+    user.resetCode = null;
+    await user.Update();
+    await context.Response.WriteAsync("[Success] Account Unlocked!");
+});
+void sendResetEmail(string email,string code)
+{
+    string SMTPServer = "smtp.gmail.com";
+    int SMTP_Port = 587;
+    string From = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(),"config.txt")).ElementAt(0);
+    string Password = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1);
+    Console.WriteLine(File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1));
+    if (Password == "nocode") return;
+    string To = email;
+    string Subject = "Account Access Locked";
+    string ResetLink = $"https://localhost:7049/emailverification?code={code}";
+    string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {code}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
+    var smtpClient = new SmtpClient(SMTPServer, SMTP_Port)
+    {
+        DeliveryMethod = SmtpDeliveryMethod.Network,
+        UseDefaultCredentials = false,
+        EnableSsl = true
+    };
+    smtpClient.Credentials = new NetworkCredential(From, Password); //Use the new password, generated from google!
+    var message = new MailMessage(new MailAddress(From, "Anni"), new System.Net.Mail.MailAddress(To, To));
+    message.Subject = Subject;
+    message.IsBodyHtml = true;
+    message.Body = Body;
+    smtpClient.Send(message);
+    Console.WriteLine($"Sent Email To: {email}");
+}
+int requiredServer = 3;
+app.MapPost("/sendConfigure", async (HttpContext context,string email,string id) =>
+{
+    try
+    {
+        var idi = int.Parse(id);
+        var storage = ServerStorage.Find(t => t.Item1 == idi && t.Item2 == email);
+        if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        var user = await WebsiteSchema.Get(storage.Item2);
+        if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        if (!user.permissionLevel.Any(l => l.userLevel >= requiredServer)) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfig.html");
+        return;
+    }
+    catch (Exception)
+    {
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
+    }
+});
+app.MapGet("/requestServers",async (HttpContext context, string email,string id) =>
+{
+    try
+    {
+        var idi = int.Parse(id);
+        var storage = ServerStorage.Find(t => t.Item1 == idi && t.Item2 == email);
+        if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        var user = await WebsiteSchema.Get(storage.Item2);
+        if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        await context.Response.WriteAsync(JsonSerializer.Serialize(user.permissionLevel.Where(u => u.userLevel >= requiredServer)));
+    }
+    catch (Exception)
+    {
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
+    }
+});
+
 app.MapGet("/createAccount", async (HttpContext context, string email, string password) =>
 {
     if (email == "None" || password == "None") { await context.Response.WriteAsync("[Failure] (Invalid Input)"); return; }
@@ -130,7 +235,14 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
         IsPaired = false,
         LoginAttempts = 0,
         PermissionLevel = 0,
-        _id = new Random().Next(int.MaxValue)
+        _id = new Random().Next(int.MaxValue),
+        IsBanned = false,
+        lockDate = DateTime.MaxValue,
+        lockRetries = 3,
+        pairCode = DataEncryption.GetRandomString(5)[0],
+        resetCode = null,
+        URLThumbnail = string.Empty,
+        permissionLevel = new List<DiscordServer>()
     };
     var res = await data.Upload();
     if (res)
@@ -188,4 +300,5 @@ public class UserResponse
     public string email { get; set; }
     public int sessionId { get; set; }
     public string URLThumbnail { get; set; }
+    public int permissionLevel { get; set; }
 }

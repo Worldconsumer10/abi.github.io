@@ -17,6 +17,11 @@ namespace CSharpWebsite.Content.Database
         public bool IsPaired { get; set; } = false;
         public bool IsBanned { get; set; } = false;
         public ulong? DiscordId { get; set; } = null;
+        public DateTime lockDate { get; set; } = DateTime.MaxValue;
+        public int lockRetries { get; set; } = 3;
+        public string? resetCode { get; set; } = null;
+        public string? pairCode { get; set; } = DataEncryption.GetRandomString(5)[0];
+        public List<DiscordServer> permissionLevel { get; set; } = new List<DiscordServer>();
         public static async Task<WebsiteSchema?> Get(string email)
         {
             try
@@ -136,5 +141,11 @@ namespace CSharpWebsite.Content.Database
             }
             return bools;
         }
+    }
+    public class DiscordServer
+    {
+        public ulong Id { get; set; } = 102412314;
+        public int userLevel { get; set; } = 0;
+        public string serverimgURL { get; set; } = string.Empty;
     }
 }
