@@ -92,7 +92,7 @@
         <label tag="button" id="loginButton" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
     </div>
     <div class="TopBarElement" style="opacity:0;right: 100px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
-        <label tag="button" id="editServers" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="ConfigureServers(this)">Configure Servers</label>
+        <label tag="button" id="editServers" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)">Configure Servers</label>
     </div>
     <!--#endregion -->
     <!--#region Quotes Buttons-->
@@ -110,7 +110,7 @@
     <!--#endregion-->
     <!--#region Login-->
     <div id="LoginTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 200px; position: absolute">
-        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseLogin(this)" />
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width: 20px; height: auto; left: 5px; top: 5px; position: absolute; z-index: 100" onclick="CloseLogin(this)" />
         <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:200">
             <form style="text-align:center">
                 <input class="inputTab" type="email" name="Email" />
@@ -128,7 +128,7 @@
     <!--#endregion-->
     <!--#region Register-->
     <div id="RegisterTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 175px; position: absolute">
-        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseRegister(this)" />
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute;z-index:100" onclick="CloseRegister(this)" />
         <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:201">
             <form style="text-align:center">
                 <input class="inputTab" type="email" name="Email" />
@@ -319,6 +319,9 @@
                     console.log(jsonResult)
                     if (json.permissionLevel >= 3) {
                         document.getElementById("editServers").style.opacity = 1;
+                        document.getElementById("editServers").onclick = ConfigureServers(document.getElementById("editServers"));
+                    } else {
+                        document.getElementById("editServers").onclick = function () { }
                     }
                 }
                 element.lastElementChild.style.color = "lime"
@@ -388,10 +391,125 @@
             element.className = "hide";
             element.style.opacity = 0;
         }
-        function OpenProfile(element) {
+        var userWallet = []
+        const formatter = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'AUD',
+            minimumFractionDigits: 0, // (this suffices for whole numbers, but will print 2500.10 as $2,500.1)
+            maximumFractionDigits: 0, // (causes 2500.99 to be printed as $2,501)
+        });
+        async function OpenProfile(element) {
             element = document.getElementById("ProfileTab")
             element.className = "show";
             element.style.opacity = 1;
+            var nodes = element.lastElementChild.firstElementChild.childNodes;
+            var possibleNodes = []
+            for (var i = 0; i < nodes.length; i++) {
+                var node = nodes[i];
+                if (node == null || node.nodeName == "#text" || node.nodeName == "P" || node.nodeName == "BR") continue;
+                possibleNodes.push(node)
+            }
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            if (json != null) {
+                if (json.URLThumbnail != "") {
+                    possibleNodes[0].setAttribute("src", json.URLThumbnail)
+                } else {
+                    possibleNodes[0].setAttribute("src", "Images/unknownprofliepic.png")
+                }
+                var userDetails = await SendHTTPGet(`/userDetails?email=${json.email}&id=${json.sessionId}`)
+                console.log(userDetails)
+                if (userDetails.includes("[Success]")) {
+                    var user = {}
+                    try {
+                        user = JSON.parse(userDetails.substring(userDetails.indexOf(' ') + 1))
+                    } catch (e) { }
+                    if (user.discordID == null) {
+                        var notpaired = document.createElement("label")
+                        notpaired.innerText = "Not Paired"
+                        notpaired.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(notpaired)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var pairid = document.createElement("label")
+                        pairid.innerText = "Pair Code: " + json.pairCode
+                        pairid.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(pairid)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var pairnotif = document.createElement("label")
+                        pairnotif.innerText = "Please pair by running <a!pair " + json.pairCode + "> in any discord Anni is in!"
+                        pairnotif.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(pairnotif)
+                    } else {
+                        var emaillabel = document.createElement("label")
+                        emaillabel.innerText = "Email: " + json.email
+                        emaillabel.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(emaillabel)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var discordidlabel = document.createElement("label")
+                        discordidlabel.innerText = "Discord ID: "+user.discordID
+                        discordidlabel.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(discordidlabel)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var username = document.createElement("label")
+                        username.innerText = "Username: " + user.user.Name
+                        username.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(username)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var XP = document.createElement("label")
+                        XP.innerHTML = `XP: <label style="color:lime;user-select: none;">${user.user.XP}</label>/<label style="color:lime;user-select: none;">${clamp(user.user.Level + 1, 2, 179769313486231570000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000) * 85}</label>`
+                        XP.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(XP)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        var Level = document.createElement("label")
+                        Level.innerHTML = `Level: <label style="color:lime;user-select: none;">${user.user.Level}</label>`
+                        Level.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(Level)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        if (user.user.Wallet.length > 0) {
+                            var wallet = document.createElement("label")
+                            userWallet = user.user.Wallet;
+                            wallet.innerHTML = `Wallet: <label style="color:lime;user-select: none;cursor: pointer;" onclick="ChangeWallet(this)">+ ${formatter.format(userWallet[0].amount).split("A")[1]} (From: ${userWallet[0].source})</label>`
+                            wallet.classList.add("profileElement")
+                            element.lastElementChild.firstElementChild.appendChild(wallet)
+                            element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        }
+                        var bank = document.createElement("label")
+                        bank.innerHTML = `Bank Balance: <label style="color:lime;user-select: none;">${formatter.format(user.user.Bank).split("A")[1]}</label>`
+                        bank.classList.add("profileElement")
+                        element.lastElementChild.firstElementChild.appendChild(bank)
+                        element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        if (user.user.Bounty > 0) {
+                            var bounty = document.createElement("label")
+                            bounty.innerHTML = `Bounty: <label style="color:orangered;user-select: none;">${formatter.format(user.user.Bounty).split("A")[1] }</label>`
+                            bounty.classList.add("profileElement")
+                            element.lastElementChild.firstElementChild.appendChild(bounty)
+                            element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
+                        }
+                        if (user.user.rudeAnni) {
+                            var rudelabel = document.createElement("label")
+                            rudelabel.innerText = `Fuck you. -Anni`
+                            rudelabel.classList.add("profileElement")
+                            element.lastElementChild.firstElementChild.appendChild(rudelabel)
+                        }
+                    }
+                }
+            }
+        }
+        var index = 0;
+        async function ChangeWallet(element) {
+            var wallet = userWallet ?? []
+            var nextEntry = wallet[0];
+            if (nextEntry != undefined) {
+                if (index + 1 < wallet.length) { nextEntry = wallet[index + 1]; } else { index = 0; }
+                console.log(index)
+                index++;
+                element.innerHTML = `<label style="color:lime;user-select: none;cursor: pointer;">+ ${formatter.format(nextEntry.amount).split("A")[1] } (From: ${nextEntry.source})</label>`
+            }
+        }
+        function clamp(n, m, x) {
+            if (n < m) { return m } else if (n > x) { return x } else { return n }
+        }
+        function CreateLineBreak() {
+            return document.createElement("br")
         }
         function CloseProfile(element) {
             element = document.getElementById("ProfileTab")
@@ -410,15 +528,12 @@
         }
     </script>
     <!--#region Profile-->
-    <div id="ProfileTab" style="opacity:0;top: 35vh; left: 15vw; border-radius: 10px; border: solid gray; background-color: gray; width: 963px; height: 300px; position: absolute">
-        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width:20px;height:auto;left:5px;top:5px;position:absolute" onclick="CloseProfile(this)" />
-        <fieldset style="display: flex; justify-content:center; text-align:center; border: solid 10px; border-radius: 5px; border-color: cyan; border-spacing: 20px 100px; width: 950px; height: 210px; min-width: 150px; left: 30px; top: 30px; max-width: 840px; position: absolute; z-index: 200">
+    <div id="ProfileTab" style="opacity: 0; top: 25vh; left: 15vw; border-radius: 10px; border: solid gray; background-color: gray; width: 963px; height: 600px; position: absolute">
+        <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width: 20px; height: auto; left: 5px; top: 5px; position: absolute; z-index: 100" onclick="CloseProfile(this)" />
+        <fieldset style="display: flex; justify-content:center; text-align:center; border: solid 10px; border-radius: 5px; border-color: cyan; border-spacing: 20px 100px; width: 950px; height: 500px; min-width: 150px; left: 30px; top: 30px; max-width: 840px; position: absolute; z-index: 200">
             <div>
-                <img src="Images/unknownprofliepic.png" style="width:auto;height:40%" />
+                <img src="Images/unknownprofliepic.png" style="width:auto;height:30%" />
                 <p></p>
-                <label class="profileElement">Email: None</label>
-                <br />
-                <label class="profileElement" name="DiscordNPaired">Discord Is Not Paired</label>
             </div>
         </fieldset>
     </div>

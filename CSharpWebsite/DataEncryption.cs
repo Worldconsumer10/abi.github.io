@@ -7,7 +7,7 @@ namespace CSharpWebsite
 {
     internal class DataEncryption
     {
-        private static string SecretKey { get; } = Environment.GetEnvironmentVariable("WebsiteSecretKey",EnvironmentVariableTarget.Machine)??"ea4309d";
+        private static string SecretKey { get; } = Environment.GetEnvironmentVariable("WebsiteSecretKey", EnvironmentVariableTarget.Machine) ?? "ea4309d";
         internal static List<string> Encrypt(string text, List<string> keys)
         {
             List<string> encrypted = new List<string>();
@@ -49,7 +49,7 @@ namespace CSharpWebsite
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
 
-                aes.Key = encoding.GetBytes(key+SecretKey);
+                aes.Key = encoding.GetBytes(MergeKey(key));
                 aes.GenerateIV();
 
                 ICryptoTransform AESEncrypt = aes.CreateEncryptor(aes.Key, aes.IV);
@@ -77,7 +77,17 @@ namespace CSharpWebsite
                 throw new Exception($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
             }
         }
-
+        static string MergeKey(string key)
+        {
+            var str = "";
+            for (int i = 0; i < Math.Clamp(key.Length, 0, 32 - SecretKey.Length); i++)
+            {
+                var character = key[i];
+                str += character;
+            }
+            str += SecretKey;
+            return str;
+        }
         public static string DecryptFragment(string plainText, string key)
         {
             try
@@ -87,7 +97,7 @@ namespace CSharpWebsite
                 aes.BlockSize = 128;
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
-                aes.Key = encoding.GetBytes(key + SecretKey);
+                aes.Key = encoding.GetBytes(MergeKey(key));
 
                 // Base 64 decode
                 byte[] base64Decoded = Convert.FromBase64String(plainText);
@@ -104,20 +114,17 @@ namespace CSharpWebsite
 
                 return encoding.GetString(AESDecrypt.TransformFinalBlock(buffer, 0, buffer.Length));
             }
-            catch (Exception e)
-            {
-                throw new Exception($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
-            }
+            catch (Exception) { return "broken"; }
         }
 
-        static byte[] HmacSHA256(String data, String key)
+        static byte[] HmacSHA256(string data, string key)
         {
             using (HMACSHA256 hmac = new HMACSHA256(encoding.GetBytes(key)))
             {
                 return hmac.ComputeHash(encoding.GetBytes(data));
             }
         }
-        internal static List<string> GetRandomString(int string_count,int string_length = 5)
+        internal static List<string> GetRandomString(int string_count, int string_length = 5)
         {
             string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
             List<string> allkeys = new List<string>();
@@ -140,7 +147,7 @@ namespace CSharpWebsite
             var key = "";
             for (int ci = 0; ci < key_count; ci++)
             {
-                for (int i = 0; i < 32-SecretKey.Length; i++)
+                for (int i = 0; i < 32 - SecretKey.Length; i++)
                 {
                     key += chars[new Random().Next(chars.Length)];
                 }

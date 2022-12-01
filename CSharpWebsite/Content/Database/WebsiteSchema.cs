@@ -10,7 +10,6 @@ namespace CSharpWebsite.Content.Database
         public List<string> Email { get; set; } = new List<string>();
         public List<string> Password { get; set; } = new List<string>();
         public List<string> EnryptionKey { get; set; } = new List<string>();
-        public int PermissionLevel { get; set; } = 0;
         public int LoginAttempts { get; set; } = 0;
         public string URLThumbnail { get; set; } = string.Empty;
         public bool IsLocked { get; set; } = false;

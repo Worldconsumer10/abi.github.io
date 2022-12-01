@@ -1,18 +1,16 @@
+using AnniUpdate.Database;
 using CSharpWebsite;
 using CSharpWebsite.Content.Database;
-using Microsoft.AspNetCore.Session;
 using Microsoft.Extensions.FileProviders;
-using System.Net.Mail;
 using System.Net;
-using System.Reflection.Metadata.Ecma335;
+using System.Net.Mail;
 using System.Text.Json;
-using System.Collections;
 
 Controller.Init();
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
-builder.Services.AddControllersWithViews(); 
+builder.Services.AddControllersWithViews();
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -84,7 +82,8 @@ app.MapGet("/previousQuote", async (HttpContext context) =>
     try
     {
         file = files[quoteIndex];
-    } catch (Exception) { }
+    }
+    catch (Exception) { }
     if (file != null)
     {
         return "Images/quotes/" + Path.GetFileName(file);
@@ -98,6 +97,9 @@ app.MapGet("/banned", async (HttpContext context) =>
 {
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/banned.html");
 });
+#endregion
+
+#region AccountRelated
 List<Tuple<int, string>> ServerStorage = new List<Tuple<int, string>>();
 app.MapGet("/submitLogin", async (HttpContext context, string email, string password) =>
 {
@@ -109,14 +111,16 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     if (getUser.lockDate != DateTime.MaxValue) { await context.Response.WriteAsync("[Failure] (Account Locked! Try Again Later!)"); return; }
     var decryptedEmail = DataEncryption.Decrypt(getUser.Email, getUser.EnryptionKey);
     var decryptPassword = DataEncryption.Decrypt(getUser.Password, getUser.EnryptionKey);
-    if (decryptPassword != password) {
+    if (decryptPassword != password)
+    {
         if (getUser.lockRetries <= 0)
         {
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
             sendResetEmail(email, getUser.resetCode);
             await context.Response.WriteAsync($"[Failure] (Incorrect Password. Resending Confirmation Email)");
-        } else
+        }
+        else
         {
             getUser.lockRetries--;
             var keys = DataEncryption.GetRandomString(5);
@@ -125,13 +129,14 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             await context.Response.WriteAsync($"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
         }
         await getUser.Update();
-        return; 
+        return;
     }
     var userIndex = new Random().Next(int.MinValue, int.MaxValue);
     if (!ServerStorage.Any(s => s.Item2.ToLower() == decryptedEmail.ToLower()))
     {
         ServerStorage.Add(Tuple.Create(userIndex, decryptedEmail));
-    } else
+    }
+    else
     {
         ServerStorage[ServerStorage.FindIndex(s => s.Item2.ToLower() == decryptedEmail.ToLower())] = Tuple.Create(userIndex, decryptedEmail);
     }
@@ -142,7 +147,7 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     {
         highestperm = highestpermlist[0].userLevel;
     }
-    await context.Response.WriteAsync("[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail,sessionId= userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
+    await context.Response.WriteAsync("[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
 });
 app.MapGet("/emailverification", async (HttpContext context, string code) =>
@@ -155,11 +160,11 @@ app.MapGet("/emailverification", async (HttpContext context, string code) =>
     await user.Update();
     await context.Response.WriteAsync("[Success] Account Unlocked!");
 });
-void sendResetEmail(string email,string code)
+void sendResetEmail(string email, string code)
 {
     string SMTPServer = "smtp.gmail.com";
     int SMTP_Port = 587;
-    string From = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(),"config.txt")).ElementAt(0);
+    string From = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(0);
     string Password = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1);
     Console.WriteLine(File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1));
     if (Password == "nocode") return;
@@ -182,7 +187,7 @@ void sendResetEmail(string email,string code)
     Console.WriteLine($"Sent Email To: {email}");
 }
 int requiredServer = 3;
-app.MapPost("/sendConfigure", async (HttpContext context,string email,string id) =>
+app.MapPost("/sendConfigure", async (HttpContext context, string email, string id) =>
 {
     try
     {
@@ -200,7 +205,7 @@ app.MapPost("/sendConfigure", async (HttpContext context,string email,string id)
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
     }
 });
-app.MapGet("/requestServers",async (HttpContext context, string email,string id) =>
+app.MapGet("/requestServers", async (HttpContext context, string email, string id) =>
 {
     try
     {
@@ -234,7 +239,6 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
         IsLocked = false,
         IsPaired = false,
         LoginAttempts = 0,
-        PermissionLevel = 0,
         _id = new Random().Next(int.MaxValue),
         IsBanned = false,
         lockDate = DateTime.MaxValue,
@@ -255,7 +259,6 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
     }
     return;
 });
-#endregion
 app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 {
     var jsonResult = JsonSerializer.Deserialize<UserResponse>(json);
@@ -283,18 +286,47 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
         {
             await context.Response.WriteAsync("NotLoggedIn");
         }
-    } else
+    }
+    else
     {
         await context.Response.WriteAsync("NotLoggedIn");
     }
     return;
 });
+#endregion
+
+#region Profiles
+app.MapGet("/userDetails", async (HttpContext context, string email, string id) =>
+{
+    try
+    {
+        var idd = int.Parse(id);
+        var target_email = ServerStorage.Find(s => s.Item1 == idd);
+        if (target_email == null || target_email.Item2 != email) { await context.Response.WriteAsync("[Failure] (Incorrect Email Recieved!)"); return; }
+        var userDetails = await WebsiteSchema.Get(target_email.Item2);
+        if (userDetails == null) { await context.Response.WriteAsync("[Failure] (Account Not Registered!)"); return; }
+        await context.Response.WriteAsync("[Success] " +
+            JsonSerializer.Serialize(new UserDetailsResponse() { pairCode = userDetails.pairCode, discordID = userDetails.DiscordId, profileURL = userDetails.URLThumbnail, servers = userDetails.permissionLevel, user = (await GuildUser.Get(userDetails.DiscordId ?? 0)) }));
+        return;
+    }
+    catch (Exception) { await context.Response.WriteAsync("[Failure] (An Error Occured!)"); return; }
+});
+#endregion
 
 app.MapDefaultControllerRoute();
+
 app.MapRazorPages();
 
 app.Run();
 
+public class UserDetailsResponse
+{
+    public string? pairCode { get; set; } = null;
+    public ulong? discordID { get; set; } = null;
+    public string profileURL { get; set; } = "Images/unknownprofliepic.png";
+    public List<DiscordServer> servers { get; set; } = new List<DiscordServer>();
+    public GuildUser? user { get; set; } = null;
+}
 public class UserResponse
 {
     public string email { get; set; }
