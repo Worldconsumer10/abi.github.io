@@ -48,7 +48,6 @@ namespace CSharpWebsite
                 aes.BlockSize = 128;
                 aes.Padding = PaddingMode.PKCS7;
                 aes.Mode = CipherMode.CBC;
-
                 aes.Key = encoding.GetBytes(MergeKey(key));
                 aes.GenerateIV();
 
@@ -79,13 +78,12 @@ namespace CSharpWebsite
         }
         static string MergeKey(string key)
         {
-            var str = "";
-            for (int i = 0; i < Math.Clamp(key.Length, 0, 32 - SecretKey.Length); i++)
+            var str = key;
+            for (int i = 0; i < SecretKey.Length; i++)
             {
-                var character = key[i];
-                str += character;
+                if (str.Length >= 32) break;
+                str += SecretKey[i];
             }
-            str += SecretKey;
             return str;
         }
         public static string DecryptFragment(string plainText, string key)
@@ -114,7 +112,9 @@ namespace CSharpWebsite
 
                 return encoding.GetString(AESDecrypt.TransformFinalBlock(buffer, 0, buffer.Length));
             }
-            catch (Exception) { return "broken"; }
+            catch (Exception e) {
+                throw new Exception($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
+            }
         }
 
         static byte[] HmacSHA256(string data, string key)

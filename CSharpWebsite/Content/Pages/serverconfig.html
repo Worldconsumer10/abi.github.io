@@ -1,153 +1,197 @@
 ﻿<!DOCTYPE html>
 <html>
-    <head>
-        <link rel="icon" type="image/x-icon" href="Images/favicon.ico">
-        <meta charset="utf-8" />
-        <title>Test Page</title>
-        <style>
-            .TopBar {
-                position: absolute;
-                width: 100vw;
-                height: 75px;
-                background-color: black;
-                left: 0;
-                top: 0;
-                right: 0;
-                margin-top: 0;
-                margin-left: 0;
-                z-index: 99
+<head>
+    <meta charset="utf-8" />
+    <title>Ubunifu's Website - Server Config</title>
+    <style>
+        .TopBar {
+            position: absolute;
+            width: 100vw;
+            height: 75px;
+            background-color: black;
+            left: 0;
+            top: 0;
+            right: 0;
+            margin-top: 0;
+            margin-left: 0;
+            z-index: 99
+        }
+
+        .TopBarElement {
+            position: absolute;
+            z-index: 101;
+            top: 25px;
+            right: 25px;
+            user-select: none;
+        }
+
+        .TopBarButton {
+            position: absolute;
+            z-index: 101;
+            top: 30px;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .alignCenter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            min-height: 100vh;
+        }
+
+        div.container {
+            display: inline-block;
+            min-width: 10vw;
+            max-width: 90vw
+        }
+
+        p {
+            text-align: center;
+        }
+
+        .alignContentCenter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .inputTab {
+            border: double;
+            border-color: red;
+            border-spacing: 20px 100px;
+            border-radius: 6px 8px
+        }
+
+        .profileElement {
+            font-size: 30px;
+            font: bold;
+        }
+
+        .show {
+            opacity: 1;
+            animation: fadeIn 0.3s linear;
+        }
+
+        .hide {
+            opacity: 0;
+            animation: fadeOut 0.3s linear;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0
             }
 
-            .TopBarElement {
-                position: absolute;
-                z-index: 101;
-                top: 25px;
-                right: 25px;
-                user-select: none;
+            100% {
+                opacity: 1
+            }
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1
             }
 
-            .TopBarButton {
-                position: absolute;
-                z-index: 101;
-                top: 30px;
-                user-select: none;
-                cursor: pointer;
+            100% {
+                opacity: 0
             }
-
-            .alignCenter {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                text-align: center;
-                min-height: 100vh;
-            }
-
-            div.container {
-                display: inline-block;
-                min-width: 10vw;
-                max-width: 90vw
-            }
-
-            p {
-                text-align: center;
-            }
-
-            .alignContentCenter {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-
-            .inputTab {
-                border: double;
-                border-color: red;
-                border-spacing: 20px 100px;
-                border-radius: 6px 8px
-            }
-
-            .profileElement {
-                font-size: 30px;
-                font: bold;
-            }
-
-            .show {
-                opacity: 1;
-                animation: fadeIn 0.3s linear;
-            }
-
-            .hide {
-                opacity: 0;
-                animation: fadeOut 0.3s linear;
-            }
-
-            @keyframes fadeIn {
-                0% {
-                    opacity: 0
-                }
-
-                100% {
-                    opacity: 1
-                }
-            }
-
-            @keyframes fadeOut {
-                0% {
-                    opacity: 1
-                }
-
-                100% {
-                    opacity: 0
-                }
-            }
-        </style>
-    </head>
-    <body style="background-color:rgb(50,50,50); color:white">
-        <div class="TopBar">
-        </div>
-        <script>
-            function SendHTTPGet(connection, content) {
-                return new Promise((resolve, reject) => {
-                    var xhr = new XMLHttpRequest();
-                    xhr.onreadystatechange = () => {
-                        if (xhr.readyState == 4 && xhr.status == 200) {
-                            resolve(xhr.responseText)
-                            return;
-                        }
-                    }
-                    xhr.open('get', connection, true);
-                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
-                    if (content != undefined) {
-                        var cont = content
-                        if (typeof content == "object") { cont = JSON.stringify(content) }
-                        xhr.send(cont);
-                    } else { xhr.send(); }
-                })
-            }
-            function SendHTTPPost(connection, content) {
-                var fm = document.createElement("form")
-                fm.setAttribute("method", "post")
-                fm.setAttribute("action", connection)
-                if (content != undefined) {
-                    var d = document.createElement("input")
-                    d.setAttribute("type", "text")
-                    d.setAttribute("id", "data")
-                    var cont = content
-                    if (typeof content == "object") { cont = JSON.stringify(content) }
-                    d.setAttribute("value", cont)
-                    fm.appendChild(d);
-                    document.body.appendChild(fm)
-                    fm.submit();
-                    d.remove();
-                } else { document.body.appendChild(fm); fm.submit(); }
-                fm.remove()
-            }
-            onload = async function () {
-                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-                var response = await SendHTTPGet(`/requestServers?email=${json.email ?? "none"}&id=${json.sessionId ?? 0}`);
-                var json = JSON.parse(response);
-                if (json == null) return;
+        }
+    </style>
+</head>
+<body style="background-color:rgb(50,50,50); color:white">
+    <div class="TopBar">
+    </div>
+    <script>
+        function SendHTTPGet(connection, content) {
+            return new Promise((resolve, reject) => {
+                fetch(connection).then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    resolve(data.response);
+                }).catch(function (err) {
+                    reject(`Error: ${err}`)
+                });
+            })
+        }
+        function SendHTTPPost(connection, content) {
+            var fm = document.createElement("form")
+            fm.setAttribute("method", "post")
+            fm.setAttribute("action", connection)
+            if (content != undefined) {
+                var d = document.createElement("input")
+                d.setAttribute("type", "text")
+                d.setAttribute("id", "data")
+                var cont = content
+                if (typeof content == "object") { cont = JSON.stringify(content) }
+                d.setAttribute("value", cont)
+                fm.appendChild(d);
+                document.body.appendChild(fm)
+                fm.submit();
+                d.remove();
+            } else { document.body.appendChild(fm); fm.submit(); }
+            fm.remove()
+        }
+        onload = async function () {
+            var id = this.document.URL.split("id=")[1];
+            var response = await SendHTTPGet(`/getServerDetails?id=${id}`)
+            if (response == undefined) return;
+            var jsonstr = response.substring(response.indexOf(' ') + 1);
+            try {
+                var json = JSON.parse(jsonstr)
                 console.log(json)
-            }
-        </script>
-    </body>
+                for (var i = 0; i < json.eventModules.length; i++) {
+                    var module = json.eventModules[i]
+                    if (module == undefined) continue;
+                    var clone = this.document.getElementById("moduleTemplate").cloneNode(true);
+                    clone.children[0].checked = module.enabled
+                    clone.children[1].innerText = module.Name
+                    clone.removeAttribute("hidden")
+                    clone.id = module.Name
+                    clone.style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:${15 + (100 * i)}px;width:max-content;`
+                    this.document.getElementById("moduleStorage").appendChild(clone)
+                }
+                for (var i = 0; i < json.commands.length; i++) {
+                    var module = json.commands[i]
+                    if (module == undefined) continue;
+                    var clone = this.document.getElementById("commandTemplate").cloneNode(true);
+                    clone.children[0].checked = module.enabled
+                    clone.children[1].innerText = module.command_name
+                    clone.removeAttribute("hidden")
+                    clone.id = module.Name
+                    clone.style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:${15 + (100 * i)}px;width:max-content;`
+                    this.document.getElementById("commandStorage").appendChild(clone)
+                }
+                this.document.getElementById("commandStorage").style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:${290 + (67 * json.commands.length)}px;min-height:290px;left:20vw; top:100px`
+            } catch (e) { }
+        }
+        async function updateModule(element) {
+            var serverid = this.document.URL.split("id=")[1];
+            var updateModuleName = element.id
+            var targetState = element.children[0].checked
+            var response = await SendHTTPGet(`/updateModule?id=${serverid}&modulename=${updateModuleName}&state=${targetState}`)
+        }
+        async function updateCommand(element) {
+            var serverid = this.document.URL.split("id=")[1];
+            var updateModuleName = element.id
+            var targetState = element.children[0].checked
+            var response = await SendHTTPGet(`/updateCommand?id=${serverid}&commandname=${updateModuleName}&state=${targetState}`)
+        }
+    </script>
+    <div>
+        <fieldset id="moduleStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:auto;min-height:300px;left:20vw; top:100px">
+            <fieldset id="moduleTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
+                <input type="checkbox" onclick="updateModule(this.parentNode)"> <!--Placeholder!-->
+                <label>Name: TestModule</label>
+            </fieldset>
+        </fieldset>
+        <fieldset id="commandStorage" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:290px;min-height:290px;left:20vw; top:100px">
+            <fieldset id="commandTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
+                <input type="checkbox" onclick="updateCommand(this.parentNode)"> <!--Placeholder!-->
+                <label>Name: TestModule</label>
+            </fieldset>
+        </fieldset>
+    </div>
+</body>
 </html>

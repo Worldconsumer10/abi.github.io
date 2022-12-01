@@ -2,8 +2,10 @@ using AnniUpdate.Database;
 using CSharpWebsite;
 using CSharpWebsite.Content.Database;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Primitives;
 using System.Net;
 using System.Net.Mail;
+using System.Text;
 using System.Text.Json;
 
 Controller.Init();
@@ -103,12 +105,12 @@ app.MapGet("/banned", async (HttpContext context) =>
 List<Tuple<int, string>> ServerStorage = new List<Tuple<int, string>>();
 app.MapGet("/submitLogin", async (HttpContext context, string email, string password) =>
 {
-    if (email == "None" || password == "None") { await context.Response.WriteAsync("[Failure] (Invalid Input)"); return; }
+    if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response,"[Failure] (Invalid Input)"); return; }
     var getUser = await WebsiteSchema.Get(email);
-    if (getUser == null) { await context.Response.WriteAsync("[Failure] (Not Registered)"); return; }
-    if (getUser.IsLocked) { await context.Response.WriteAsync("[Failure] (Account Locked!)"); return; }
-    if (getUser.IsBanned) { await context.Response.WriteAsync("[Failure] (Account Banned!)"); return; }
-    if (getUser.lockDate != DateTime.MaxValue) { await context.Response.WriteAsync("[Failure] (Account Locked! Try Again Later!)"); return; }
+    if (getUser == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
+    if (getUser.IsLocked) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Locked!)"); return; }
+    if (getUser.IsBanned) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Banned!)"); return; }
+    if (getUser.lockDate != DateTime.MaxValue) { await ContextResponse.RespondAsync(context.Response,"[Failure] (Account Locked! Try Again Later!)"); return; }
     var decryptedEmail = DataEncryption.Decrypt(getUser.Email, getUser.EnryptionKey);
     var decryptPassword = DataEncryption.Decrypt(getUser.Password, getUser.EnryptionKey);
     if (decryptPassword != password)
@@ -118,7 +120,7 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
             sendResetEmail(email, getUser.resetCode);
-            await context.Response.WriteAsync($"[Failure] (Incorrect Password. Resending Confirmation Email)");
+            await ContextResponse.RespondAsync(context.Response,$"[Failure] (Incorrect Password. Resending Confirmation Email)");
         }
         else
         {
@@ -126,7 +128,7 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
             sendResetEmail(email, getUser.resetCode);
-            await context.Response.WriteAsync($"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
+            await ContextResponse.RespondAsync(context.Response,$"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
         }
         await getUser.Update();
         return;
@@ -147,18 +149,18 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     {
         highestperm = highestpermlist[0].userLevel;
     }
-    await context.Response.WriteAsync("[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
+    await ContextResponse.RespondAsync(context.Response,"[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
 });
 app.MapGet("/emailverification", async (HttpContext context, string code) =>
 {
     var user = (await WebsiteSchema.GetAll()).Find(c => c.resetCode == code);
-    if (user == null) { await context.Response.WriteAsync("[Failure] Invalid Code"); return; }
+    if (user == null) { await ContextResponse.RespondAsync(context.Response,"[Failure] Invalid Code"); return; }
     user.lockDate = DateTime.MaxValue;
     user.lockRetries = 3;
     user.resetCode = null;
     await user.Update();
-    await context.Response.WriteAsync("[Success] Account Unlocked!");
+    await ContextResponse.RespondAsync(context.Response,"[Success] Account Unlocked!");
 });
 void sendResetEmail(string email, string code)
 {
@@ -197,7 +199,7 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
         var user = await WebsiteSchema.Get(storage.Item2);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         if (!user.permissionLevel.Any(l => l.userLevel >= requiredServer)) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfig.html");
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfiglist.html");
         return;
     }
     catch (Exception)
@@ -214,19 +216,84 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.Item2);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        await context.Response.WriteAsync(JsonSerializer.Serialize(user.permissionLevel.Where(u => u.userLevel >= requiredServer)));
+        List<ServerOverviewList> lsits = new List<ServerOverviewList>();
+        foreach (var server in user.permissionLevel.Where(u => u.userLevel >= requiredServer))
+        {
+            if (server == null) continue;
+            lsits.Add(new ServerOverviewList()
+            {
+                server = server,
+                Name = (await GuildServer.Get(server.Id))?.GuildName ?? "Unknown Guild"
+            });
+        }
+        await ContextResponse.RespondAsync(context.Response,JsonSerializer.Serialize(lsits));
     }
     catch (Exception)
     {
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
     }
 });
+app.MapGet("/getServerDetails", async (HttpContext context, string id) =>
+{
+    try
+    {
+        ulong idd = ulong.Parse(id);
+        var server = await GuildServer.Get(idd);
+        if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
+        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(server));
+    }
+    catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured)"); return; }
+});
+app.MapGet("/updateModule", async (HttpContext context, string id, string moduleName, string state) =>
+{
+    try
+    {
+        ulong idd = ulong.Parse(id);
+        var server = await GuildServer.Get(idd);
+        if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
+        var module = server.eventModules.Find(m => m.Name == moduleName);
+        if (module == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Module Does Not Exist!)"); return; }
+        module.enabled = bool.Parse(state);
+        server.eventModules[server.eventModules.FindIndex(m => m.Name == moduleName)] = module;
+        await server.UpdateOne();
+        await ContextResponse.RespondAsync(context.Response, "[Success] (Module Updated)");
+    }
+    catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured)"); return; }
+});
+app.MapGet("/updateCommand", async (HttpContext context, string id, string commandname, string state) =>
+{
+    try
+    {
+        ulong idd = ulong.Parse(id);
+        var server = await GuildServer.Get(idd);
+        if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
+        var module = server.commands.Find(m => m.command_name == commandname);
+        if (module == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Module Does Not Exist!)"); return; }
+        module.enabled = bool.Parse(state);
+        server.commands[server.commands.FindIndex(m => m.command_name == commandname)] = module;
+        await server.UpdateOne();
+        await ContextResponse.RespondAsync(context.Response, "[Success] (Module Updated)");
+    }
+    catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured)"); return; }
+});
+app.MapPost("/loadServerConfig", async (HttpContext context, string id) =>
+{
+    try
+    {
+        ulong idd = ulong.Parse(id);
+        var server = await GuildServer.Get(idd);
+        if (server == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfig.html");
+
+    }
+    catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
+});
 
 app.MapGet("/createAccount", async (HttpContext context, string email, string password) =>
 {
-    if (email == "None" || password == "None") { await context.Response.WriteAsync("[Failure] (Invalid Input)"); return; }
+    if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response,"[Failure] (Invalid Input)"); return; }
     var getUser = await WebsiteSchema.Get(email);
-    if (getUser != null) { await context.Response.WriteAsync("[Failure] (Already Registered)"); return; }
+    if (getUser != null) { await ContextResponse.RespondAsync(context.Response,"[Failure] (Already Registered)"); return; }
     var keys = DataEncryption.RandomKeyString(new Random().Next(5, 6));
     var encryptedEmail = DataEncryption.Encrypt(email, keys);
     var encryptedPassword = DataEncryption.Encrypt(password, keys);
@@ -251,11 +318,11 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
     var res = await data.Upload();
     if (res)
     {
-        await context.Response.WriteAsync("[Success] (Account Created)");
+        await ContextResponse.RespondAsync(context.Response,"[Success] (Account Created)");
     }
     else
     {
-        await context.Response.WriteAsync("[Failure] (Failed To Create Account!)");
+        await ContextResponse.RespondAsync(context.Response,"[Failure] (Failed To Create Account!)");
     }
     return;
 });
@@ -269,7 +336,7 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
         {
             if (element.Item2.ToLower() == jsonResult.email.ToLower())
             {
-                await context.Response.WriteAsync("Verified");
+                await ContextResponse.RespondAsync(context.Response,"Verified");
             }
             else
             {
@@ -279,17 +346,17 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
                     gu.IsBanned = true;
                     await gu.Update();
                 }
-                await context.Response.WriteAsync("InvalidMove");
+                await ContextResponse.RespondAsync(context.Response,"InvalidMove");
             }
         }
         else
         {
-            await context.Response.WriteAsync("NotLoggedIn");
+            await ContextResponse.RespondAsync(context.Response,"NotLoggedIn");
         }
     }
     else
     {
-        await context.Response.WriteAsync("NotLoggedIn");
+        await ContextResponse.RespondAsync(context.Response,"NotLoggedIn");
     }
     return;
 });
@@ -302,14 +369,14 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
     {
         var idd = int.Parse(id);
         var target_email = ServerStorage.Find(s => s.Item1 == idd);
-        if (target_email == null || target_email.Item2 != email) { await context.Response.WriteAsync("[Failure] (Incorrect Email Recieved!)"); return; }
+        if (target_email == null || target_email.Item2 != email) { await ContextResponse.RespondAsync(context.Response,"[Failure] (Incorrect Email Recieved!)"); return; }
         var userDetails = await WebsiteSchema.Get(target_email.Item2);
-        if (userDetails == null) { await context.Response.WriteAsync("[Failure] (Account Not Registered!)"); return; }
-        await context.Response.WriteAsync("[Success] " +
+        if (userDetails == null) { await ContextResponse.RespondAsync(context.Response,"[Failure] (Account Not Registered!)"); return; }
+        await ContextResponse.RespondAsync(context.Response,"[Success] " +
             JsonSerializer.Serialize(new UserDetailsResponse() { pairCode = userDetails.pairCode, discordID = userDetails.DiscordId, profileURL = userDetails.URLThumbnail, servers = userDetails.permissionLevel, user = (await GuildUser.Get(userDetails.DiscordId ?? 0)) }));
         return;
     }
-    catch (Exception) { await context.Response.WriteAsync("[Failure] (An Error Occured!)"); return; }
+    catch (Exception) { await ContextResponse.RespondAsync(context.Response,"[Failure] (An Error Occured!)"); return; }
 });
 #endregion
 
@@ -319,6 +386,25 @@ app.MapRazorPages();
 
 app.Run();
 
+//just adds a respondasync option that prevents errors because of an incorrect return.
+internal class ContextResponse
+{
+    public static async Task RespondAsync(HttpResponse response, string text, CancellationToken cancellationToken = default)
+    {
+        var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
+        await response.WriteAsync(JsonSerializer.Serialize(obj),Encoding.UTF8,cancellationToken);
+    }
+    public static async Task RespondAsync(HttpResponse response, string text,Encoding encoding, CancellationToken cancellationToken = default)
+    {
+        var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
+        await response.WriteAsync(JsonSerializer.Serialize(obj),encoding, cancellationToken);
+    }
+}
+public class ServerOverviewList
+{
+    public DiscordServer server { get; set; } = new DiscordServer();
+    public string Name { get; set; } = "Test Server";
+}
 public class UserDetailsResponse
 {
     public string? pairCode { get; set; } = null;

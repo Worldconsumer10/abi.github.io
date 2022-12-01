@@ -3,7 +3,7 @@
 <head>
     <link rel="icon" type="image/x-icon" href="Images/favicon.ico">
     <meta charset="utf-8" />
-    <title>Test Page</title>
+    <title>Ubunifu's Website</title>
     <style>
         .TopBar {
             position: absolute;
@@ -91,7 +91,7 @@
     <div class="TopBarElement" style="right: 25px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
         <label tag="button" id="loginButton" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
     </div>
-    <div class="TopBarElement" style="opacity:0;right: 100px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
+    <div class="TopBarElement" style="opacity: 0; top:25px; right: 100px; border: medium solid lime; border-radius: 5px; font-size: 20px;z-index:100;position:absolute">
         <label tag="button" id="editServers" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)">Configure Servers</label>
     </div>
     <!--#endregion -->
@@ -213,22 +213,15 @@
                 element.style.filter = "brightness(100%)"
             }
         }
-        function SendHTTPGet(connection, content) {
+        function SendHTTPGet(connection) {
             return new Promise((resolve, reject) => {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = () => {
-                    if (xhr.readyState == 4 && xhr.status == 200) {
-                        resolve(xhr.responseText)
-                        return;
-                    }
-                }
-                xhr.open('get', connection, true);
-                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
-                if (content != undefined) {
-                    var cont = content
-                    if (typeof content == "object") { cont = JSON.stringify(content) }
-                    xhr.send(cont);
-                } else { xhr.send(); }
+                fetch(connection).then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    resolve(data.response);
+                }).catch(function (err) {
+                    reject(`Error: ${err}`)
+                });
             })
         }
         function SendHTTPPost(connection, content) {
@@ -310,16 +303,17 @@
             var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`)
             var state = result.split("]")[0].split("[")[1]
             var message = result.split(")")[0].split("(")[1]
-            if (state == "Success") {
+            if (state.includes("Success")) {
                 var json = result.split(") ")[1]
                 if (isJson(json)) {
                     var jsonResult = JSON.parse(json)
                     console.log("[INFO] This is a note for all you wannabe-hackers.. i stored the logged in email address in the sessionStorage. Fuck around with this as much as you like it will be verified server-side anyway. Also dont modify it. This verification can have your account banned if you modified the sessionStorage")
                     sessionStorage.setItem("SessionDetails", json)
-                    console.log(jsonResult)
-                    if (json.permissionLevel >= 3) {
-                        document.getElementById("editServers").style.opacity = 1;
-                        document.getElementById("editServers").onclick = ConfigureServers(document.getElementById("editServers"));
+                    if (jsonResult.permissionLevel >= 3) {
+                        document.getElementById("editServers").parentElement.style.opacity = 1;
+                        document.getElementById("editServers").parentElement.removeAttribute("hidden")
+                        document.getElementById("editServers").parentElement.className = "show"
+                        document.getElementById("editServers").onclick = function () { ConfigureServers(document.getElementById("editServers")); }
                     } else {
                         document.getElementById("editServers").onclick = function () { }
                     }
@@ -360,15 +354,6 @@
                 setTimeout(() => {
                     CloseLogin(element)
                     CloseRegister(element)
-                    var login = document.getElementById("loginButton")
-                    login.onclick = function () { OpenProfile(element); }
-                    login.innerText = "Profile"
-                    var protab = document.getElementById("ProfileTab")
-                    var datagroup = protab.lastElementChild.firstElementChild;
-                    var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-                    if (json != null) {
-                        datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
-                    }
                 }, 5000)
             }
         }
@@ -445,7 +430,7 @@
                         element.lastElementChild.firstElementChild.appendChild(emaillabel)
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
                         var discordidlabel = document.createElement("label")
-                        discordidlabel.innerText = "Discord ID: "+user.discordID
+                        discordidlabel.innerText = "Discord ID: " + user.discordID
                         discordidlabel.classList.add("profileElement")
                         element.lastElementChild.firstElementChild.appendChild(discordidlabel)
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
@@ -479,7 +464,7 @@
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
                         if (user.user.Bounty > 0) {
                             var bounty = document.createElement("label")
-                            bounty.innerHTML = `Bounty: <label style="color:orangered;user-select: none;">${formatter.format(user.user.Bounty).split("A")[1] }</label>`
+                            bounty.innerHTML = `Bounty: <label style="color:orangered;user-select: none;">${formatter.format(user.user.Bounty).split("A")[1]}</label>`
                             bounty.classList.add("profileElement")
                             element.lastElementChild.firstElementChild.appendChild(bounty)
                             element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
@@ -491,6 +476,11 @@
                             element.lastElementChild.firstElementChild.appendChild(rudelabel)
                         }
                     }
+                } else {
+                    var emaillabel = document.createElement("label")
+                    emaillabel.innerText = "This is an Error.."
+                    emaillabel.classList.add("profileElement")
+                    element.lastElementChild.firstElementChild.appendChild(emaillabel)
                 }
             }
         }
