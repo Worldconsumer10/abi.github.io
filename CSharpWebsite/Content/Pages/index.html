@@ -145,11 +145,34 @@
     <script language="javascript">
         var initColor = document.body.style.color
         onload = async () => {
-            var newquote = await SendHTTPGet("/randomizeQuote")
-            if (newquote != undefined) {
-                var element = document.getElementById("quoteImage")
-                element.setAttribute("src", newquote)
+            SetQuotes()
+            SetupButtons()
+            RestoreProfile()
+            try {
+                setInterval(() => {
+                    if (sessionStorage.getItem("SessionDetails") != undefined) {
+                        var move = SendHTTPGet(`/verifyLogin?json=${sessionStorage.getItem("SessionDetails")}`)
+                        if (move == "InvalidMove") {
+                            document.URL = location.origin + "/banned"
+                        }
+                    }
+                }, 10000)
+            } catch (e) { console.log(e) }
+        }
+        function RestoreProfile() {
+            var loginTab = document.getElementById("LoginTab")
+            var login = document.getElementById("loginButton")
+            var element = loginTab.lastElementChild.firstElementChild
+            login.onclick = function () { OpenProfile(login); }
+            login.innerText = "Profile"
+            var protab = document.getElementById("ProfileTab")
+            var datagroup = protab.lastElementChild.firstElementChild;
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            if (json != null && json.URLThumbnail != null) {
+                datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
             }
+        }
+        function SetupButtons() {
             var elements = document.getElementsByTagName("button")
             for (i in elements) {
                 var element = elements[i]
@@ -164,26 +187,13 @@
                     }
                 }
             }
-            var storage = sessionStorage.getItem("SessionDetails")
-            if (storage != null) {
-                var login = document.getElementById("loginButton")
-                login.onclick = function () { OpenProfile(element); }
-                login.innerText = "Profile"
-                var protab = document.getElementById("ProfileTab")
-                var datagroup = protab.lastElementChild.firstElementChild;
-                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-                if (json != null) {
-                    datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
-                }
+        }
+        async function SetQuotes() {
+            var newquote = await SendHTTPGet("/randomizeQuote")
+            if (newquote != undefined) {
+                var element = document.getElementById("quoteImage")
+                element.setAttribute("src", newquote)
             }
-            setInterval(() => {
-                if (sessionStorage.getItem("SessionDetails") != undefined) {
-                    var move = SendHTTPGet(`/verifyLogin?json=${sessionStorage.getItem("SessionDetails")}`)
-                    if (move == "InvalidMove") {
-                        document.URL = location.origin + "/banned"
-                    }
-                }
-            }, 10000)
         }
         async function ConfigureServers(element) {
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))

@@ -104,7 +104,12 @@
     <body style="background-color:rgb(50,50,50); color:white">
         <div class="TopBar">
         </div>
+        <fieldset class="TopBarElement" style="border:solid;border-color:lime;border-radius:7px;top:10px;font:bold;font-size:15px;user-select:none;cursor:pointer" onclick="ReturnToList(this)">Back To Homepage</fieldset>
         <script>
+            async function ReturnToList(element) {
+                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                await SendHTTPPost(`/`);
+            }
             function SendHTTPGet(connection) {
                 return new Promise((resolve, reject) => {
                     fetch(connection).then(function (response) {

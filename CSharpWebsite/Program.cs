@@ -211,14 +211,11 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
 {
     try
     {
-        Console.WriteLine("Recieved Server Request");
         var idi = int.Parse(id);
         var storage = ServerStorage.Find(t => t.Item1 == idi && t.Item2 == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        Console.WriteLine("User has a storage entry");
         var user = await WebsiteSchema.Get(storage.Item2);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        Console.WriteLine("Obtained user website schema");
         List<ServerOverviewList> lsits = new List<ServerOverviewList>();
         var serverlists = user.permissionLevel.Where(u => u.userLevel >= requiredServer);
         if (serverlists == null || serverlists.Count() <= 0) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
@@ -231,7 +228,6 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
                 Name = (await GuildServer.Get(server.Id))?.GuildName ?? "Unknown Guild"
             });
         }
-        Console.WriteLine("Sending Server List");
         await ContextResponse.RespondAsync(context.Response,JsonSerializer.Serialize(lsits));
     }
     catch (Exception e)
