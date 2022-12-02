@@ -38,7 +38,6 @@
             justify-content: center;
             align-items: center;
             text-align: center;
-            min-height: 100vh;
         }
 
         div.container {
@@ -248,8 +247,8 @@
         }
     </script>
     <div>
-        <fieldset id="eventTab" onclick="eventSwitch(this)" style="cursor: pointer; left: 10vw; top: 100px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray;"></fieldset>
-        <fieldset id="commandTab" style="left: 10vw; top: 225px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray;"></fieldset>
+        <fieldset id="eventTab" onclick="eventSwitch(this)" style="cursor: pointer; left: 10vw; top: 100px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray;text-align:center;"><label class="profileElement" style="top:20px">Event<br />Settings</label></fieldset>
+        <fieldset id="commandTab" style="left: 10vw; top: 225px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center;"><label class="profileElement" style="top:20px">Command<br />Settings</label></fieldset>
         <fieldset id="moduleStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:auto;min-height:300px;left:20vw; top:100px">
             <fieldset id="moduleTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
                 <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateModule(this.parentNode)"> <!--Placeholder!-->

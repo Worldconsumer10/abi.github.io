@@ -147,7 +147,9 @@
         onload = async () => {
             SetQuotes()
             SetupButtons()
-            RestoreProfile()
+            if (sessionStorage.getItem("SessionDetails")) {
+                RestoreProfile()
+            }
             try {
                 setInterval(() => {
                     if (sessionStorage.getItem("SessionDetails") != undefined) {
@@ -160,16 +162,25 @@
             } catch (e) { console.log(e) }
         }
         function RestoreProfile() {
+            var jsonResult = JSON.parse(sessionStorage.getItem("SessionDetails"))
             var loginTab = document.getElementById("LoginTab")
             var login = document.getElementById("loginButton")
             var element = loginTab.lastElementChild.firstElementChild
-            login.onclick = function () { OpenProfile(login); }
+            login.onclick = function () { OpenProfile(element); }
             login.innerText = "Profile"
             var protab = document.getElementById("ProfileTab")
             var datagroup = protab.lastElementChild.firstElementChild;
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
             if (json != null && json.URLThumbnail != null) {
                 datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
+            }
+            if (jsonResult.permissionLevel >= 3) {
+                document.getElementById("editServers").parentElement.style.opacity = 1;
+                document.getElementById("editServers").parentElement.removeAttribute("hidden")
+                document.getElementById("editServers").parentElement.className = "show"
+                document.getElementById("editServers").onclick = function () { ConfigureServers(document.getElementById("editServers")); }
+            } else {
+                document.getElementById("editServers").onclick = function () { }
             }
         }
         function SetupButtons() {
