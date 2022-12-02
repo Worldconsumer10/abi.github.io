@@ -105,7 +105,7 @@
         <div class="TopBar">
         </div>
         <script>
-            function SendHTTPGet(connection, content) {
+            function SendHTTPGet(connection) {
                 return new Promise((resolve, reject) => {
                     fetch(connection).then(function (response) {
                         return response.json();
@@ -137,6 +137,7 @@
             onload = async function () {
                 var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
                 var response = await SendHTTPGet(`/requestServers?email=${json.email ?? "none"}&id=${json.sessionId ?? 0}`);
+                console.log(response)
                 var json = JSON.parse(response);
                 if (json == null) return;
                 for (var i = 0; i < json.length; i++) {

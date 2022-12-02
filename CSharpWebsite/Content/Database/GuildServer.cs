@@ -113,10 +113,12 @@ namespace AnniUpdate.Database
     {
         public string command_name { get; set; } = "help";
         public bool enabled { get; set; } = true;
+        public bool canBeDisabled { get; set; } = true;
     }
     public class Module
     {
         public string Name { get; set; } = "Test";
         public bool enabled { get; set; } = true;
+        public bool canBeDisabled { get; set; } = true;
     }
 }
