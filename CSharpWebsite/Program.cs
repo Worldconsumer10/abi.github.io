@@ -7,6 +7,10 @@ using System.Net.Mail;
 using System.Text;
 using System.Text.Json;
 
+HttpClient client = new HttpClient();
+
+List<ResetRequest> resetRequests = new List<ResetRequest>();
+
 Controller.Init();
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,11 +26,8 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/error");
-    app.UseHsts();
-}
+app.UseExceptionHandler("/error");
+app.UseHsts();
 
 app.UseHttpsRedirection();
 app.UseSession();
@@ -93,6 +94,14 @@ app.MapGet("/previousQuote", async (HttpContext context) =>
 #endregion
 
 #region Errors
+app.MapGet("/error", (HttpContext context) =>
+{
+    Console.WriteLine(context.Request.Body);
+});
+app.MapPost("/error", (HttpContext context) =>
+{
+    Console.WriteLine(context.Request.Body);
+});
 app.MapGet("/banned", async (HttpContext context) =>
 {
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/error.html");
@@ -117,7 +126,9 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
         {
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
-            sendResetEmail(email, getUser.resetCode);
+            string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
+            string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
+            SendEmail(email, "Account Access Locked", Body);
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. Resending Confirmation Email)");
         }
         else
@@ -125,7 +136,9 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             getUser.lockRetries--;
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
-            sendResetEmail(email, getUser.resetCode);
+            string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
+            string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
+            SendEmail(email, "Account Access Locked", Body);
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
         }
         await getUser.Update();
@@ -160,32 +173,6 @@ app.MapGet("/emailverification", async (HttpContext context, string code) =>
     await user.Update();
     await ContextResponse.RespondAsync(context.Response, "[Success] Account Unlocked!");
 });
-void sendResetEmail(string email, string code)
-{
-    string SMTPServer = "smtp.gmail.com";
-    int SMTP_Port = 587;
-    string From = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(0);
-    string Password = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1);
-    Console.WriteLine(File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1));
-    if (Password == "nocode") return;
-    string To = email;
-    string Subject = "Account Access Locked";
-    string ResetLink = $"https://localhost:7049/emailverification?code={code}";
-    string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {code}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
-    var smtpClient = new SmtpClient(SMTPServer, SMTP_Port)
-    {
-        DeliveryMethod = SmtpDeliveryMethod.Network,
-        UseDefaultCredentials = false,
-        EnableSsl = true
-    };
-    smtpClient.Credentials = new NetworkCredential(From, Password); //Use the new password, generated from google!
-    var message = new MailMessage(new MailAddress(From, "Anni"), new System.Net.Mail.MailAddress(To, To));
-    message.Subject = Subject;
-    message.IsBodyHtml = true;
-    message.Body = Body;
-    smtpClient.Send(message);
-    Console.WriteLine($"Sent Email To: {email}");
-}
 int requiredServer = 3;
 app.MapPost("/sendConfigure", async (HttpContext context, string email, string id) =>
 {
@@ -383,11 +370,119 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
 });
 #endregion
 
+#region AccountReset
+app.MapGet("/submitResetRequest", async (HttpContext context, string email) =>
+{
+    var femail = string.Join(string.Empty, email.Split('"'));
+    resetRequests.RemoveAll(r => r.requestDate.AddMinutes(30) < DateTime.Now);
+    var resetUser = await WebsiteSchema.Get(femail);
+    if (resetUser == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Email Not Registered)"); return; }
+    if (resetRequests.Any(r => r.email == femail))
+    {
+        resetRequests.RemoveAll(r => r.email == femail);
+    }
+    var resetRequest = new ResetRequest()
+    {
+        email = femail,
+        requestDate = DateTime.Now,
+        _id = new Random().NextInt64(long.MinValue, long.MaxValue)
+    };
+    resetRequests.Add(resetRequest);
+    var resetUrl = $"{GetBaseUrl(context)}/resetPassword?id={resetRequest._id}";
+    SendEmail(femail, "Account Password Reset", $"Hi {femail},<br/>I have recieved your request for a password reset!<br/>Lets get that underway shall we?<br/>I just need you to follow this link to reset your password<br/><br/>{resetUrl}<br/><br/><i>If you did not do this action, please disregard this email! The request will time out after 30 minutes<i/><br/>This is an automated message! Do not reply!");
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Reset Email Sent)");
+});
+
+app.MapGet("/resetPassword", async (HttpContext context, string id) =>
+{
+    var request = resetRequests.Find(r => r._id.ToString() == id);
+    if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
+    if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/ResetPassword.html");
+});
+app.MapGet("/getRRequest", async (HttpContext context, string id) =>
+{
+    var request = resetRequests.Find(r => r._id.ToString() == id);
+    if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
+    if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(request));
+});
+app.MapGet("/setNewPassword", async (HttpContext context, string id, string password) =>
+{
+    var request = resetRequests.Find(r => r._id.ToString() == id);
+    if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
+    if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
+    var user = await WebsiteSchema.Get(request.email);
+    if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
+    var decryptedPassword = DataEncryption.Decrypt(user.Password, user.EnryptionKey);
+    if (decryptedPassword.ToLower() == password.ToLower()) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Same Password)"); return; }
+    if (GetPasswordSimilarity(decryptedPassword, password) > 50) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Passwords Too Similar!)"); return; }
+    var encryptedPassword = DataEncryption.Encrypt(password, user.EnryptionKey);
+    user.Password = encryptedPassword;
+    var result = await user.Update();
+    if (result)
+    {
+        await ContextResponse.RespondAsync(context.Response, "[Success] " + GetBaseUrl(context));
+    }
+    else
+    {
+        await ContextResponse.RespondAsync(context.Response, "[Failure] (Did Not Update)");
+    }
+});
+#endregion
+//returns a (%) of how similar the passwords are
+int GetPasswordSimilarity(string a, string b)
+{
+    var largeststring = a.Length > b.Length ? a : b;
+    int similarity = 0;
+    for (int i = 0; i < largeststring.Length; i++)
+    {
+        if (i > b.Length || i > a.Length) break;
+        var character1 = a[i];
+        var character2 = b[i];
+        if (char.IsWhiteSpace(character1) || char.IsWhiteSpace(character2)) continue;
+        if (character1.ToString().ToLower() == character2.ToString().ToLower()) { similarity++; }
+    }
+    return (int)Math.Floor(((double)similarity / (double)largeststring.Length) * 100);
+}
+
 app.MapDefaultControllerRoute();
 
 app.MapRazorPages();
 
 app.Run();
+
+string GetBaseUrl(HttpContext context, bool includePort = true)
+{
+    var host = context.Request.Host.Host;
+    var port = context.Request.Host.Port;
+    var scheme = context.Request.Scheme;
+    return $"{scheme}://{host}{(includePort ? $":{port}" : "")}";
+}
+
+void SendEmail(string email, string subject, string body)
+{
+    string SMTPServer = "smtp.gmail.com";
+    int SMTP_Port = 587;
+    string From = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(0);
+    string Password = File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1);
+    Console.WriteLine(File.ReadLines(Path.Combine(Directory.GetCurrentDirectory(), "config.txt")).ElementAt(1));
+    if (Password == "nocode") return;
+    string To = email;
+    var smtpClient = new SmtpClient(SMTPServer, SMTP_Port)
+    {
+        DeliveryMethod = SmtpDeliveryMethod.Network,
+        UseDefaultCredentials = false,
+        EnableSsl = true
+    };
+    smtpClient.Credentials = new NetworkCredential(From, Password); //Use the new password, generated from google!
+    var message = new MailMessage(new MailAddress(From, "Anni"), new System.Net.Mail.MailAddress(To, To));
+    message.Subject = subject;
+    message.IsBodyHtml = true;
+    message.Body = body;
+    smtpClient.Send(message);
+    Console.WriteLine($"Sent Email To: {email}");
+}
 
 //just adds a respondasync option that prevents errors because of an incorrect return.
 internal class ContextResponse
@@ -395,13 +490,21 @@ internal class ContextResponse
     public static async Task RespondAsync(HttpResponse response, string text, CancellationToken cancellationToken = default)
     {
         var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
+        response.StatusCode = 200;
         await response.WriteAsync(JsonSerializer.Serialize(obj), Encoding.UTF8, cancellationToken);
     }
     public static async Task RespondAsync(HttpResponse response, string text, Encoding encoding, CancellationToken cancellationToken = default)
     {
         var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
+        response.StatusCode = 200;
         await response.WriteAsync(JsonSerializer.Serialize(obj), encoding, cancellationToken);
     }
+}
+public class ResetRequest
+{
+    public long _id { get; set; } = new Random().NextInt64(long.MinValue, long.MaxValue);
+    public string email { get; set; } = string.Empty;
+    public DateTime requestDate { get; set; } = DateTime.Now;
 }
 public class ServerOverviewList
 {

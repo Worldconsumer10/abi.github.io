@@ -109,7 +109,7 @@
     </div>
     <!--#endregion-->
     <!--#region Login-->
-    <div id="LoginTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 200px; position: absolute">
+    <div id="LoginTab" style="opacity:0;top: 40vh; left: 40vw; border-radius: 10px; border: solid gray; background-color: gray; width: 263px; height: 225px; position: absolute">
         <img tag="button" id="arrow" onmouseover="FadeArrow(this)" onmouseout="BrightenArrow(this)" src="/Images/siteassets/crossicon.png" style="width: 20px; height: auto; left: 5px; top: 5px; position: absolute; z-index: 100" onclick="CloseLogin(this)" />
         <fieldset class="alignContentCenter" style="border: solid 10px; border-color: cyan; border-spacing: 20px 100px; width: 40px; min-width: 150px; left:30px;top:30px; max-width:500px;position:absolute;z-index:200">
             <form style="text-align:center">
@@ -120,6 +120,8 @@
                 <input type="button" onclick="SubmitLogin(this.parentNode)" value="Log In" />
                 <br />
                 <input type="button" onclick="StartSignup(this)" value="Sign Up" />
+                <br />
+                <input type="button" onclick="SendReset(this)" value="Reset Password"/>
                 <br />
                 <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred">Invalid Login</label>
             </form>
@@ -143,6 +145,46 @@
     </div>
     <!--#endregion-->
     <script language="javascript">
+        async function SendReset(element) {
+            var logintab = document.getElementById("LoginTab").children[1].children[0]
+            var emailinput = GetElementByName(element.parentElement, "Email")
+            var email = emailinput.value
+            if (email == null || email == undefined || email == "") { email = "None" }
+            var response = await SendHTTPGet(`/submitResetRequest?email="${email}"`)
+            console.log(response)
+            var state = response.split("]")[0].split("[")[1]
+            var message = response.split(")")[0].split("(")[1]
+            console.log(state)
+            console.log(message)
+            if (state.includes("Success")) {
+                logintab.lastElementChild.style.color = "lime"
+                logintab.lastElementChild.style["text-shadow"] = "0.5px 0.5px green";
+                logintab.lastElementChild.removeAttribute("hidden")
+                logintab.lastElementChild.style.opacity = 1;
+                logintab.lastElementChild.className = "show"
+                logintab.parentNode.parentNode.style.height = "250px";
+                logintab.lastElementChild.innerText = message.replace("/", "(").replace("=", ")")
+            } else {
+                logintab.lastElementChild.style.color = "red"
+                logintab.lastElementChild.style["text-shadow"] = "0.5px 0.5px darkred";
+                logintab.lastElementChild.removeAttribute("hidden")
+                logintab.lastElementChild.style.opacity = 1;
+                logintab.lastElementChild.className = "show"
+                logintab.parentNode.parentNode.style.height = "250px";
+                logintab.lastElementChild.innerText = message.replace("/", ")").replace("=", ")")
+            }
+        }
+        function GetElementByName(element, name) {
+            var val = null
+            for (var i = 0; i < element.children.length; i++) {
+                var child = element.children[i]
+                if (child == undefined || child == null) continue;
+                try {
+                    if (child.name == name) { val = child; break; }
+                } catch (e) { continue; }
+            }
+            return val;
+        }
         var initColor = document.body.style.color
         onload = async () => {
             SetQuotes()
@@ -320,7 +362,7 @@
             element.lastElementChild.style.opacity = 0;
             element.lastElementChild.className = "hide"
             element.lastElementChild.setAttribute("hidden", "true")
-            element.parentNode.parentNode.style.height = "200px";
+            element.parentNode.parentNode.style.height = "225px";
             var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`)
             var state = result.split("]")[0].split("[")[1]
             var message = result.split(")")[0].split("(")[1]
@@ -344,11 +386,9 @@
                 element.lastElementChild.removeAttribute("hidden")
                 element.lastElementChild.style.opacity = 1;
                 element.lastElementChild.className = "show"
-                element.parentNode.parentNode.style.height = "210px";
+                element.parentNode.parentNode.style.height = "250px";
                 element.lastElementChild.innerText = message.replace("/", "(").replace("=", ")")
                 setTimeout(() => {
-                    CloseLogin(element)
-                    CloseRegister(element)
                     var login = document.getElementById("loginButton")
                     login.onclick = function () { OpenProfile(element); }
                     login.innerText = "Profile"
@@ -358,7 +398,7 @@
                     if (json != null && json.URLThumbnail != null) {
                         datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
                     }
-                }, 5000)
+                }, 1000)
             } else if (message.includes("0 Retries Left")) {
                 alert("Your this account has been locked due to security reasons. An email will be sent to this email to confirm your ownership")
             } else if (message.includes("Account Locked! Try Again Later!") || message.includes("Resending Confirmation Email")) {
@@ -370,12 +410,8 @@
                 element.lastElementChild.removeAttribute("hidden")
                 element.lastElementChild.style.opacity = 1;
                 element.lastElementChild.className = "show"
-                element.parentNode.parentNode.style.height = "210px";
+                element.parentNode.parentNode.style.height = "250px";
                 element.lastElementChild.innerText = message.replace("/", ")").replace("=", ")")
-                setTimeout(() => {
-                    CloseLogin(element)
-                    CloseRegister(element)
-                }, 5000)
             }
         }
         function isJson(str) {
@@ -423,7 +459,6 @@
                     possibleNodes[0].setAttribute("src", "Images/unknownprofliepic.png")
                 }
                 var userDetails = await SendHTTPGet(`/userDetails?email=${json.email}&id=${json.sessionId}`)
-                console.log(userDetails)
                 if (userDetails.includes("[Success]")) {
                     var user = {}
                     try {
