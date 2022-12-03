@@ -200,7 +200,6 @@ app.MapGet("/emailverification", async (HttpContext context, string code) =>
     await user.Update();
     await ContextResponse.RespondAsync(context.Response, "[Success] Account Unlocked!");
 });
-}
 int requiredServer = 3;
 app.MapPost("/sendConfigure", async (HttpContext context, string email, string id) =>
 {
