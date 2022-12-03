@@ -153,7 +153,9 @@
                     var server = json[i];
                     if (server == undefined) continue;
                     var clone = document.getElementById("servertemplate").cloneNode(true)
-                    clone.children[0].setAttribute("src", server.server.serverimgURL)
+                    var url = server.server.serverimgURL
+                    if (url == null) { url = "Images/unknownprofliepic.png" }
+                    clone.children[0].setAttribute("src", url)
                     clone.removeAttribute("hidden")
                     clone.setAttribute("id", server.server.Id)
                     clone.children[2].innerText = server.Name
