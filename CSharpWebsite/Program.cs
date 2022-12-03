@@ -125,11 +125,9 @@ app.MapGet("/previousQuote", async (HttpContext context) =>
 #region Errors
 app.MapGet("/error", (HttpContext context) =>
 {
-    Console.WriteLine(context.Request.Body);
 });
 app.MapPost("/error", (HttpContext context) =>
 {
-    Console.WriteLine(context.Request.Body);
 });
 app.MapGet("/banned", async (HttpContext context) =>
 {
@@ -202,6 +200,7 @@ app.MapGet("/emailverification", async (HttpContext context, string code) =>
     await user.Update();
     await ContextResponse.RespondAsync(context.Response, "[Success] Account Unlocked!");
 });
+}
 int requiredServer = 3;
 app.MapPost("/sendConfigure", async (HttpContext context, string email, string id) =>
 {
@@ -600,7 +599,6 @@ void SendEmail(string email, string subject, string body)
     message.IsBodyHtml = true;
     message.Body = body;
     smtpClient.Send(message);
-    Console.WriteLine($"Sent Email To: {email}");
 }
 
 //just adds a respondasync option that prevents errors because of an incorrect return.
