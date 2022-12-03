@@ -444,12 +444,17 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
 app.MapGet("/addResponse", async (HttpContext context, string id, string prompts, string response) =>
 {
     var promptarray = new List<string>();
+    var responsearray = new List<string>();
     foreach (var prompt in prompts.Trim('"').Split(",").ToList())
     {
         if (prompt != null) { promptarray.Add(prompt.Trim(' ')); }
     }
-    var resp = response.Trim('"').Trim(' ');
-    if (resp.All(c => char.IsWhiteSpace(c))) { resp = "Unknown Response"; }
+    foreach (var resppppp in response.Trim('"').Split(",").ToList())
+    {
+        var respp = resppppp;
+        if (respp.All(c => char.IsWhiteSpace(c))) { respp = "Unknown Response"; }
+        if (respp != null) { responsearray.Add(respp.Trim(' ')); }
+    }
     var server = await GuildServer.Get(ulong.Parse(id));
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
     if (server.chatResponses.Any(r => r.phrases.Any(p => promptarray.Any(a => a.ToLower().Contains(p.ToLower()))))) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Duplicate Prompts)"); return; }
@@ -457,7 +462,7 @@ app.MapGet("/addResponse", async (HttpContext context, string id, string prompts
     {
         enabled = true,
         phrases = promptarray,
-        responses = resp
+        responses = responsearray
     };
     server.chatResponses.Add(chatresponse);
     await server.UpdateOne();

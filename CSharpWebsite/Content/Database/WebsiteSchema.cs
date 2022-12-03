@@ -153,7 +153,7 @@ namespace CSharpWebsite.Content.Database
         /// <summary>
         /// response to these phrases
         /// </summary>
-        public string responses { get; set; } = "test response";
+        public List<string> responses { get; set; } = new List<string>();
         /// <summary>
         /// Will this response be active?
         /// </summary>

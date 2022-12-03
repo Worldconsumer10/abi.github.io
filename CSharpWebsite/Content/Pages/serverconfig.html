@@ -209,7 +209,7 @@
                     var response = json[i];
                     if (response == null || response == undefined) continue;
                     var prompts = response.phrases.join(", ")
-                    var responseret = response.responses
+                    var responseret = response.responses.join(", ")
                     var enabled = response.enabled == true ? true : false
                     await addTemplatedResponse(prompts, responseret, enabled)
                 }
@@ -431,7 +431,7 @@
             <fieldset id="responseAdd" style="fill-opacity: 99; opacity: 1; border: solid; border-color: black; background-color: gray; position: absolute; z-index: 101; border-radius: 7px; height: 60px; top:15px; min-width: 500px; width: max-content;">
                 <label>Prompts: </label><input title="This is a list of prompts that the bot in this server should listen for. Prompts are seperated by (,)" type="text" />
                 <br />
-                <label>Response: </label><input title="This is the response to any of the prompts. (You cannot have multiple responses!)" type="text" />
+                <label>Response: </label><input title="This is the response to any of the prompts. Responses are seperated by (,)" type="text" />
                 <br />
                 <input type="button" value="Add Response" onclick="addResponse(this.parentElement)" style="border-radius:5px" />
             </fieldset>
