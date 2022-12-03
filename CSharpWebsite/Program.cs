@@ -38,6 +38,35 @@ app.UseStaticFiles(new StaticFileOptions
 });
 app.UseAuthorization();
 
+System.Timers.Timer verifyAccounts = new System.Timers.Timer(60000);
+verifyAccounts.Elapsed += VerifyElapsed;
+verifyAccounts.AutoReset = true;
+verifyAccounts.Start();
+
+async void VerifyElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+{
+    var notverified = (await WebsiteSchema.GetAll()).Where(a => !a.IsVerified);
+    foreach (var account in notverified)
+    {
+        if (account == null) continue;
+        if (account.IsVerified) continue;
+        if (account.creationDate.AddHours(24) > DateTime.Now)
+        {
+            TimeSpan timeleft = DateTime.Now.Subtract(account.creationDate.AddHours(24));
+            if (timeleft.Hours == 12)
+            {
+                var decryptedEmail = DataEncryption.Decrypt(account.Email, account.EnryptionKey);
+                var body = $"Hi {decryptedEmail}<br/>I have sent you this email in regards to your unverified account!<br/>Please click the link in the email sent when you created your account. This will verify your account, you have <{timeleft.Hours.ToString("D2")}:{timeleft.Minutes.ToString("D2")}:{timeleft.Seconds.ToString("D2")}>(HH:MM:SS) left before your account is terminated<br/><br/><i>This is an automated message! Do not reply!<i/>";
+                SendEmail(decryptedEmail, "Account Verification", body);
+            }
+        }
+        else
+        {
+            await account.Remove();
+        }
+    }
+}
+
 #region Index
 app.MapGet("/", async (HttpContext context) =>
 {
@@ -296,25 +325,38 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
         IsLocked = false,
         IsPaired = false,
         LoginAttempts = 0,
-        _id = new Random().Next(int.MaxValue),
+        _id = new Random().Next(int.MinValue, int.MaxValue),
         IsBanned = false,
         lockDate = DateTime.MaxValue,
         lockRetries = 3,
         pairCode = DataEncryption.GetRandomString(5)[0],
         resetCode = null,
         URLThumbnail = string.Empty,
-        permissionLevel = new List<DiscordServer>()
+        permissionLevel = new List<DiscordServer>(),
+        IsVerified = false,
+        creationDate = DateTime.Now
     };
     var res = await data.Upload();
     if (res)
     {
-        await ContextResponse.RespondAsync(context.Response, "[Success] (Account Created)");
+        var verifylink = $"{GetBaseUrl(context)}/verifyAccount?id={data._id}";
+        var body = $"Hi {email}!<br/>I see you want to create an account with me!<br/>Lets make this quick and easy!<br/>Just click this link:<br/>{verifylink}<br/><br/><i>This is an automated message! Do not reply!<i/>";
+        SendEmail(email, "Verify Email", body);
+        await ContextResponse.RespondAsync(context.Response, "[Success] (Account Created. Check Email)");
     }
     else
     {
         await ContextResponse.RespondAsync(context.Response, "[Failure] (Failed To Create Account!)");
     }
     return;
+});
+app.MapGet("/verifyAccount", async (HttpContext context, string id) =>
+{
+    var account = (await WebsiteSchema.GetAll()).Find(r => r._id.ToString() == id);
+    if (account == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
+    account.IsVerified = true;
+    await account.Update();
+    await FileServerMiddleware.ReplyFile(context, "Context/Pages/accountverified.html");
 });
 app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 {
@@ -430,6 +472,83 @@ app.MapGet("/setNewPassword", async (HttpContext context, string id, string pass
     }
 });
 #endregion
+
+#region UserControl
+List<ResetRequest> closeRequest = new List<ResetRequest>();
+app.MapPost("/editUser", async (HttpContext context, string id) =>
+{
+    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/useredit.html");
+});
+app.MapPost("/closeAccount", async (HttpContext context, string id) =>
+{
+    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
+    var request = new ResetRequest()
+    {
+        _id = new Random().NextInt64(long.MinValue, long.MaxValue),
+        email = storage.Item2,
+        requestDate = DateTime.Now
+    };
+    closeRequest.Add(request);
+    string ResetLink = $"{GetBaseUrl(context)}/emailclose?code={request._id}";
+    string Body = $"Dear {storage.Item2}<br/>I have recieved a request for your account to be terminated!<br/>Fear not! Closing your account can be done by just following this link:<br/>{ResetLink}<br/><i>If you did not do this action, please reset your password immediately!<i/><br/><br/>This is an automated message! Do not reply!";
+    SendEmail(storage.Item2, "Account Close Request", Body);
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+});
+app.MapGet("/emailclose", async (HttpContext context, string id) =>
+{
+    var request = resetRequests.Find(r => r._id.ToString() == id);
+    if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
+    if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
+    var user = await WebsiteSchema.Get(request.email);
+    if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
+    await user.Remove();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Account Closed!)");
+});
+app.MapPost("/lockAccount", async (HttpContext context, string id) =>
+{
+    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
+    var user = await WebsiteSchema.Get(storage.Item2);
+    if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
+    user.lockDate = DateTime.Now;
+    user.lockRetries = 0;
+    user.IsLocked = true;
+    var keys = DataEncryption.GetRandomString(5);
+    user.resetCode = keys[new Random().Next(keys.Count)];
+    await user.Update();
+    string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={user.resetCode}";
+    string Body = $"Dear {storage.Item2}<br/>As per your request your account has been locked! If you wish to unlock your account follow this link to restore it:<br/>{ResetLink}<br/>Or use the code: {user.resetCode}<br/>When attempting to login next!<br/><br/><br/>This is an automated message! Do not reply!";
+    SendEmail(storage.Item2, "Account Locked", Body);
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+});
+app.MapPost("/resetPasswordR", async (HttpContext context, string id) =>
+{
+    resetRequests.RemoveAll(r => r.requestDate.AddMinutes(30) < DateTime.Now);
+    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
+    if (resetRequests.Any(r => r.email == storage.Item2))
+    {
+        resetRequests.RemoveAll(r => r.email == storage.Item2);
+    }
+    var resetRequest = new ResetRequest()
+    {
+        email = storage.Item2,
+        requestDate = DateTime.Now,
+        _id = new Random().NextInt64(long.MinValue, long.MaxValue)
+    };
+    resetRequests.Add(resetRequest);
+    var resetUrl = $"{GetBaseUrl(context)}/resetPassword?id={resetRequest._id}";
+    SendEmail(storage.Item2, "Account Password Reset", $"Hi {storage.Item2},<br/>I have recieved your request for a password reset!<br/>Lets get that underway shall we?<br/>I just need you to follow this link to reset your password<br/><br/>{resetUrl}<br/><br/><i>If you did not do this action, please disregard this email! The request will time out after 30 minutes<i/><br/>This is an automated message! Do not reply!");
+    await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+});
+#endregion
+
 //returns a (%) of how similar the passwords are
 int GetPasswordSimilarity(string a, string b)
 {

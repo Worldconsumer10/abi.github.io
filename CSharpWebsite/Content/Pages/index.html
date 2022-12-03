@@ -88,6 +88,9 @@
     <div class="TopBar">
     </div>
     <!--#region Label Buttons-->
+    <div class="TopBarElement" style="opacity:0;border:solid;border-color:lime;border-radius:5px;font-size:20px">
+        <label tag="button" id="editProfile" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)">Account Settings</label>
+    </div>
     <div class="TopBarElement" style="right: 25px;border:solid;border-color:lime;border-radius:5px;font-size:20px">
         <label tag="button" id="loginButton" onmouseover="MouseOverLabel(this)" onmouseout="MouseLeftLabel(this)" onclick="OpenLogin(this)">Login</label>
     </div>
@@ -121,7 +124,7 @@
                 <br />
                 <input type="button" onclick="StartSignup(this)" value="Sign Up" />
                 <br />
-                <input type="button" onclick="SendReset(this)" value="Reset Password"/>
+                <input type="button" onclick="SendReset(this)" value="Reset Password" />
                 <br />
                 <label hidden name="invalidTag" style="opacity:0;color: red; text-shadow: 0.5px 0.5px darkred">Invalid Login</label>
             </form>
@@ -150,7 +153,7 @@
             var emailinput = GetElementByName(element.parentElement, "Email")
             var email = emailinput.value
             if (email == null || email == undefined || email == "") { email = "None" }
-            var response = await SendHTTPGet(`/submitResetRequest?email="${email}"`)
+            var response = await SendHTTPGet(`/submitResetRequest?email="${email}"`).catch(e => { })
             console.log(response)
             var state = response.split("]")[0].split("[")[1]
             var message = response.split(")")[0].split("(")[1]
@@ -193,9 +196,9 @@
                 RestoreProfile()
             }
             try {
-                setInterval(() => {
+                setInterval(async () => {
                     if (sessionStorage.getItem("SessionDetails") != undefined) {
-                        var move = SendHTTPGet(`/verifyLogin?json=${sessionStorage.getItem("SessionDetails")}`)
+                        var move = await SendHTTPGet(`/verifyLogin?json=${sessionStorage.getItem("SessionDetails")}`).catch(e => { })
                         if (move == "InvalidMove") {
                             document.URL = location.origin + "/banned"
                         }
@@ -203,24 +206,33 @@
                 }, 10000)
             } catch (e) { console.log(e) }
         }
-        function RestoreProfile() {
-            var jsonResult = JSON.parse(sessionStorage.getItem("SessionDetails"))
-            var loginTab = document.getElementById("LoginTab")
+        function RestoreProfile()
+        {
+            var profilesettings = document.getElementById("editProfile").parentElement
             var login = document.getElementById("loginButton")
+            var loginTab = document.getElementById("LoginTab")
+            var protab = document.getElementById("ProfileTab")
+            var editServers = document.getElementById("editServers")
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            //showing profile settings option
+            profilesettings.style.opacity = 1;
+            profilesettings.classList.toggle("show", true)
+            profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${json.sessionId}`).then((r) => { }).catch((e) => { }) }
+            login.parentElement.style.right = "175px"
+            editServers.parentElement.style.right = "242.5px";
+            //rest of shit
             var element = loginTab.lastElementChild.firstElementChild
             login.onclick = function () { OpenProfile(element); }
             login.innerText = "Profile"
-            var protab = document.getElementById("ProfileTab")
             var datagroup = protab.lastElementChild.firstElementChild;
-            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
             if (json != null && json.URLThumbnail != null) {
                 datagroup.firstElementChild.setAttribute("src", json.URLThumbnail)
             }
-            if (jsonResult.permissionLevel >= 3) {
+            if (json.permissionLevel >= 3) {
                 document.getElementById("editServers").parentElement.style.opacity = 1;
                 document.getElementById("editServers").parentElement.removeAttribute("hidden")
                 document.getElementById("editServers").parentElement.className = "show"
-                document.getElementById("editServers").onclick = function () { ConfigureServers(document.getElementById("editServers")); }
+                document.getElementById("editServers").onclick = function () { ConfigureServers(editServers); }
             } else {
                 document.getElementById("editServers").onclick = function () { }
             }
@@ -242,7 +254,7 @@
             }
         }
         async function SetQuotes() {
-            var newquote = await SendHTTPGet("/randomizeQuote")
+            var newquote = await SendHTTPGet("/randomizeQuote").catch(e => { })
             if (newquote != undefined) {
                 var element = document.getElementById("quoteImage")
                 element.setAttribute("src", newquote)
@@ -250,17 +262,17 @@
         }
         async function ConfigureServers(element) {
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-            await SendHTTPPost(`/sendConfigure?email=${json.email??"none"}&id=${json.sessionId??0}`);
+            await SendHTTPPost(`/sendConfigure?email=${json.email ?? "none"}&id=${json.sessionId ?? 0}`);
         }
         async function Next() {
-            var newquote = await SendHTTPGet("/nextQuote")
+            var newquote = await SendHTTPGet("/nextQuote").catch(e => { })
             if (newquote != undefined) {
                 var element = document.getElementById("quoteImage")
                 element.setAttribute("src", newquote)
             }
         }
         async function Previous() {
-            var newquote = await SendHTTPGet("/previousQuote")
+            var newquote = await SendHTTPGet("/previousQuote").catch(e => { })
             if (newquote != undefined) {
                 var element = document.getElementById("quoteImage")
                 element.setAttribute("src", newquote)
@@ -283,7 +295,7 @@
                 }).then(function (data) {
                     resolve(data.response);
                 }).catch(function (err) {
-                    reject(`Error: ${err}`)
+                    reject(`Fetch Error: ${err}`)
                 });
             })
         }
@@ -332,7 +344,7 @@
             element.lastElementChild.setAttribute("hidden", "true")
             element.parentNode.parentNode.style.height = "200px";
             console.log("Sending Creation Request");
-            var result = await SendHTTPGet(`/createAccount?email=${email}&password=${password}`)
+            var result = await SendHTTPGet(`/createAccount?email=${email}&password=${password}`).catch(e => { })
             console.log("Recieved Response");
             if (isJson(result)) {
                 var result = JSON.parse(result)
@@ -363,7 +375,7 @@
             element.lastElementChild.className = "hide"
             element.lastElementChild.setAttribute("hidden", "true")
             element.parentNode.parentNode.style.height = "225px";
-            var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`)
+            var result = await SendHTTPGet(`/submitLogin?email=${email}&password=${password}`).catch(e => { })
             var state = result.split("]")[0].split("[")[1]
             var message = result.split(")")[0].split("(")[1]
             if (state.includes("Success")) {
@@ -372,6 +384,12 @@
                     var jsonResult = JSON.parse(json)
                     console.log("[INFO] This is a note for all you wannabe-hackers.. i stored the logged in email address in the sessionStorage. Fuck around with this as much as you like it will be verified server-side anyway. Also dont modify it. This verification can have your account banned if you modified the sessionStorage")
                     sessionStorage.setItem("SessionDetails", json)
+                    var profilesettings = document.getElementById("editProfile").parentElement
+                    profilesettings.style.opacity = 1;
+                    profilesettings.classList.toggle("show", true)
+                    profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${jsonResult.sessionId}`).then((r) => { }).catch((e) => { }) }
+                    document.getElementById("loginButton").parentElement.style.right = "175px"
+                    document.getElementById("editServers").parentElement.style.right = "242.5px";
                     if (jsonResult.permissionLevel >= 3) {
                         document.getElementById("editServers").parentElement.style.opacity = 1;
                         document.getElementById("editServers").parentElement.removeAttribute("hidden")
@@ -403,7 +421,7 @@
                 alert("Your this account has been locked due to security reasons. An email will be sent to this email to confirm your ownership")
             } else if (message.includes("Account Locked! Try Again Later!") || message.includes("Resending Confirmation Email")) {
                 var result = prompt("Your account was locked! Check your email for a link or a code.\n\nIf you have a code put it here:")
-                await SendHTTPGet(`/emailverification?code=${result}`)
+                await SendHTTPGet(`/emailverification?code=${result}`).catch(e => { })
             } else {
                 element.lastElementChild.style.color = "red"
                 element.lastElementChild.style["text-shadow"] = "0.5px 0.5px darkred";
@@ -458,7 +476,7 @@
                 } else {
                     possibleNodes[0].setAttribute("src", "Images/unknownprofliepic.png")
                 }
-                var userDetails = await SendHTTPGet(`/userDetails?email=${json.email}&id=${json.sessionId}`)
+                var userDetails = await SendHTTPGet(`/userDetails?email=${json.email}&id=${json.sessionId}`).catch(e => { })
                 if (userDetails.includes("[Success]")) {
                     var user = {}
                     try {
@@ -548,7 +566,7 @@
                 if (index + 1 < wallet.length) { nextEntry = wallet[index + 1]; } else { index = 0; }
                 console.log(index)
                 index++;
-                element.innerHTML = `<label style="color:lime;user-select: none;cursor: pointer;">+ ${formatter.format(nextEntry.amount).split("A")[1] } (From: ${nextEntry.source})</label>`
+                element.innerHTML = `<label style="color:lime;user-select: none;cursor: pointer;">+ ${formatter.format(nextEntry.amount).split("A")[1]} (From: ${nextEntry.source})</label>`
             }
         }
         function clamp(n, m, x) {

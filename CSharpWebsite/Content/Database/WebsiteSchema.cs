@@ -15,6 +15,8 @@ namespace CSharpWebsite.Content.Database
         public bool IsLocked { get; set; } = false;
         public bool IsPaired { get; set; } = false;
         public bool IsBanned { get; set; } = false;
+        public bool IsVerified { get; set; } = false;
+        public DateTime creationDate { get; set; } = DateTime.Now;
         public ulong? DiscordId { get; set; } = null;
         public DateTime lockDate { get; set; } = DateTime.MaxValue;
         public int lockRetries { get; set; } = 3;

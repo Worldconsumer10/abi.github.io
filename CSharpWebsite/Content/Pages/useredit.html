@@ -3,7 +3,7 @@
 <head>
     <link rel="icon" type="image/x-icon" href="Images/favicon.ico">
     <meta charset="utf-8" />
-    <title>Ubunifu's Website - Reset Password</title>
+    <title>Ubunifu's Website - Edit Profile</title>
     <style>
         .TopBar {
             position: absolute;
@@ -39,7 +39,7 @@
             justify-content: center;
             align-items: center;
             text-align: center;
-            min-height: 2.5vh;
+            min-height: 100vh;
         }
 
         div.container {
@@ -101,19 +101,26 @@
         }
     </style>
 </head>
-<body style="background-color: rgb(50,50,50); color: white">
+<body style="background-color:rgb(50,50,50); color:white">
     <div class="TopBar">
     </div>
     <fieldset id="resetfield" style="text-align:center;border-radius:10px;border-color:black;background-color:gray;left:35vw;top:200px;position:absolute;min-width:600px;min-height:100px;">
-        <label class="alignCenter">Resetting Email For:&nbsp;<label style="color:lime;">TestEmail@test.com</label></label>
+        <label style="font-size: 20px">Email: Unknown</label>
         <br />
-        <label class="alignCenter">Input A New Password: <input type="password" /></label>
+        <label style="font-size: 20px">Highest Permission Level: Unknown</label>
         <br />
-        <input type="button" value="Change Password" style="background:none;border-radius:10px;border-color:lime;color:white;" onclick="SubmitNewPassword(this.parentNode)"/>
+        <label style="font-size: 20px">Is Paired: false</label>
         <br />
-        <label id="error" style="color:red;opacity:0;">Failed To Upload</label>
+        <label style="font-size: 20px">Paired With: Unknown</label>
+        <br />
+        <br />
+        <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white" type="button" value="Close Account" onclick="CloseAccount(this.parentElement)" />
+        <br />
+        <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white " type="button" value="Lock Account" onclick="LockAccount(this.parentElement)"/>
+        <br />
+        <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" type="button" value="Request Password Reset" onclick="ResetPassword(this.parentElement)"/>
     </fieldset>
-    <script>
+    <script lang="en" language="javascript">
         function SendHTTPGet(connection) {
             return new Promise((resolve, reject) => {
                 fetch(connection).then(function (response) {
@@ -121,7 +128,7 @@
                 }).then(function (data) {
                     resolve(data.response);
                 }).catch(function (err) {
-                    reject(`Error: ${err}`)
+                    reject(`Fetch Error: ${err}`)
                 });
             })
         }
@@ -143,40 +150,23 @@
             } else { document.body.appendChild(fm); fm.submit(); }
             fm.remove()
         }
-        window.onload = async function () {
-            var error = document.getElementById("error")
-            error.style.opacity = 0;
-            var id = document.URL.split("id=")[1];
-            var response = await SendHTTPGet(`/getRRequest?id=${id}`)
-            try {
-                var jsonstr = response.substring(response.indexOf(' ') + 1)
-                var json = JSON.parse(jsonstr)
-                var field = document.getElementById("resetfield")
-                field.children[0].children[0].innerText = json.email
-            } catch (e) {
-                document.URL = document.URL.split("?")[0]
-            }
+        async function CloseAccount(element) {
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            sessionStorage.removeItem("SessionDetails")
+            console.log("[Info] FYI Close account logs you out server-side as well.. so dont think you can just copy the sessionStorage")
+            await SendHTTPPost(`/closeAccount?id=${json.sessionId}`).catch((e) => { })
         }
-        async function SubmitNewPassword(element) {
-            var newPassword = element.children[2].children[0].value
-            var id = document.URL.split("id=")[1];
-            console.log(`Submitting New Password: ${newPassword}`)
-            var response = await SendHTTPGet(`/setNewPassword?id=${id}&password=${newPassword}`)
-            console.log(response)
-            if (response.includes("[Success]")) {
-                var baseurl = response.substring(response.indexOf(' ') + 1)
-                location.href = baseurl;
-            } else {
-                var errcode = response.substring(response.indexOf(' ') + 1).split("(")[1].split(")")[0]
-                var error = document.getElementById("error")
-                error.style.opacity = 1;
-                error.className = "show";
-                error.innerText = errcode
-                setTimeout(() => {
-                    error.style.opacity = 0;
-                    error.className = "hide";
-                },2000)
-            }
+        async function LockAccount(element) {
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            sessionStorage.removeItem("SessionDetails")
+            console.log("[Info] FYI Lock account logs you out server-side as well.. so dont think you can just copy the sessionStorage")
+            await SendHTTPPost(`/lockAccount?id=${json.sessionId}`).catch((e) => { })
+        }
+        async function LockAccount(element) {
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            sessionStorage.removeItem("SessionDetails")
+            console.log("[Info] Locking your account logs you out completely, both client-side and server-side")
+            await SendHTTPPost(`/resetPasswordR?id=${json.sessionId}`).catch((e) => { })
         }
     </script>
 </body>
