@@ -156,7 +156,9 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
             string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
             SendEmail(email, "Account Access Locked", Body);
+            await getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. Resending Confirmation Email)");
+            return;
         }
         else
         {
@@ -166,10 +168,10 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
             string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
             SendEmail(email, "Account Access Locked", Body);
+            await getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
+            return;
         }
-        await getUser.Update();
-        return;
     }
     getUser.lockRetries = 3;
     await getUser.Update();
@@ -197,8 +199,8 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             permissionLevel = highestperm
         };
         ServerStorage.Add(nstorage);
-        Console.WriteLine($"New Session Started For: {decryptedEmail} (ID: {userIndex})");
         await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
+        return;
     }
     else
     {
@@ -210,11 +212,9 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             permissionLevel = highestperm
         };
         ServerStorage[ServerStorage.FindIndex(s => s.email.ToLower() == decryptedEmail.ToLower())] = nstorage;
-        Console.WriteLine($"Session Overwritten For: {decryptedEmail} (ID: {userIndex})");
-        Console.WriteLine($"Session ID: {userIndex}");
         await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
+        return;
     }
-    return;
 });
 app.MapGet("/emailverification", async (HttpContext context, string code) =>
 {
@@ -231,8 +231,7 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
 {
     try
     {
-        var idi = LongParse(id);
-        var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
+        var storage = ServerStorage.Find(t => t.id.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
@@ -240,17 +239,16 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfiglist.html");
         return;
     }
-    catch (Exception)
+    catch (Exception e)
     {
-        await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
+        await ContextResponse.RespondAsync(context.Response, $"{e.Message}\n{e.InnerException}\n{e.StackTrace}");
     }
 });
 app.MapGet("/requestServers", async (HttpContext context, string email, string id) =>
 {
     try
     {
-        var idi = LongParse(id);
-        var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
+        var storage = ServerStorage.Find(t => t.id.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
@@ -439,6 +437,71 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
         return;
     }
     catch (Exception) { await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured!)"); return; }
+});
+#endregion
+
+#region ServerConfig
+app.MapGet("/addResponse", async (HttpContext context, string id, string prompts, string response) =>
+{
+    var promptarray = new List<string>();
+    foreach (var prompt in prompts.Trim('"').Split(",").ToList())
+    {
+        if (prompt != null) { promptarray.Add(prompt.Trim(' ')); }
+    }
+    var resp = response.Trim('"').Trim(' ');
+    if (resp.All(c => char.IsWhiteSpace(c))) { resp = "Unknown Response"; }
+    var server = await GuildServer.Get(ulong.Parse(id));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    if (server.chatResponses.Any(r => r.phrases.Any(p => promptarray.Any(a => a.ToLower().Contains(p.ToLower()))))) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Duplicate Prompts)"); return; }
+    var chatresponse = new ChatResponses()
+    {
+        enabled = true,
+        phrases = promptarray,
+        responses = resp
+    };
+    server.chatResponses.Add(chatresponse);
+    await server.UpdateOne();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Updated Server!)"); return;
+});
+app.MapGet("/getServerResponses", async (HttpContext context, string id) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(id));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(server.chatResponses)); return;
+});
+app.MapGet("/updateResponse", async (HttpContext context, string id, string prompt, string state) =>
+{
+    var promptarray = new List<string>();
+    foreach (var pro in prompt.Trim('"').Split(",").ToList())
+    {
+        if (pro != null) { promptarray.Add(pro.Trim(' ')); }
+    }
+    var server = await GuildServer.Get(ulong.Parse(id));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    var b_state = bool.Parse(state);
+    var resp = server.chatResponses.Find(c => c.phrases.Any(p => promptarray.Any(a => a.ToLower() == p.ToLower())));
+    if (resp == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (No Valid Responses!)"); return; }
+    resp.enabled = b_state;
+    server.chatResponses[server.chatResponses.FindIndex(r => r.phrases == resp.phrases)] = resp;
+    await server.UpdateOne();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Updated Server Response!)");
+    return;
+});
+app.MapGet("/removeResponse", async (HttpContext context, string id, string prompt) =>
+{
+    var promptarray = new List<string>();
+    foreach (var pro in prompt.Trim('"').Split(",").ToList())
+    {
+        if (pro != null) { promptarray.Add(pro.Trim(' ')); }
+    }
+    var server = await GuildServer.Get(ulong.Parse(id));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    var resp = server.chatResponses.Find(c => c.phrases.Any(p => promptarray.Any(a => a.ToLower() == p.ToLower())));
+    if (resp == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (No Valid Responses!)"); return; }
+    server.chatResponses.RemoveAt(server.chatResponses.FindIndex(r => r.phrases == resp.phrases));
+    await server.UpdateOne();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Updated Server Response!)");
+    return;
 });
 #endregion
 

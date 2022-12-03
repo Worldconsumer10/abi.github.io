@@ -144,6 +144,21 @@ namespace CSharpWebsite.Content.Database
             return bools;
         }
     }
+    public class ChatResponses
+    {
+        /// <summary>
+        /// Phrases that this response looks for
+        /// </summary>
+        public List<string> phrases { get; set; } = new List<string>();
+        /// <summary>
+        /// response to these phrases
+        /// </summary>
+        public string responses { get; set; } = "test response";
+        /// <summary>
+        /// Will this response be active?
+        /// </summary>
+        public bool enabled { get; set; }
+    }
     public class DiscordServer
     {
         public ulong Id { get; set; } = 102412314;

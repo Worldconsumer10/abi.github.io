@@ -15,6 +15,7 @@ namespace AnniUpdate.Database
         public List<ulong> BannedIDs { get; set; } = new List<ulong>();
         public List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>> TempBans { get; set; } = new List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>>();
         public double Inflation { get; set; } = 0;
+        public List<ChatResponses> chatResponses { get; set; } = new List<ChatResponses>();
         public static async Task<List<GuildServer>> GetAll()
         {
             try

@@ -170,7 +170,7 @@
                     clone.style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:${15 + (100 * i)}px;width:max-content;`
                     this.document.getElementById("moduleStorage").appendChild(clone)
                 }
-                this.document.getElementById("moduleStorage").style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:${300 + (75 * json.eventModules.length)};min-height:300px;left:20vw; top:100px`
+                this.document.getElementById("moduleStorage").style.height = `${50+(50*json.eventModules.length)}px`
                 for (var i = 0; i < json.commands.length; i++) {
                     var module = json.commands[i]
                     if (module == undefined) continue;
@@ -195,8 +195,25 @@
                     clone.style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:${15 + (100 * i)}px;width:max-content;`
                     this.document.getElementById("commandStorage").appendChild(clone)
                 }
-                this.document.getElementById("commandStorage").style = `opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:${290 + (75 * json.commands.length)}px;min-height:290px;left:20vw; top:100px`
+                this.document.getElementById("commandStorage").style.height = `${290 + (72.5 * json.commands.length)}px`
             } catch (e) { }
+            //new stuff
+            LoadAllResponses(id)
+        }
+        async function LoadAllResponses(id) {
+            var response = await SendHTTPGet(`/getServerResponses?id=${id}`).catch((e) => { })
+            if (response != null && response != undefined) {
+                var jsonstr = response.substring(response.indexOf(' ') + 1);
+                var json = JSON.parse(jsonstr);
+                for (var i = 0; i < json.length; i++) {
+                    var response = json[i];
+                    if (response == null || response == undefined) continue;
+                    var prompts = response.phrases.join(", ")
+                    var responseret = response.responses
+                    var enabled = response.enabled == true ? true : false
+                    await addTemplatedResponse(prompts, responseret, enabled)
+                }
+            }
         }
         async function updateModule(element) {
             var serverid = this.document.URL.split("id=")[1];
@@ -226,40 +243,197 @@
             var response = await SendHTTPGet(`/updateCommand?id=${serverid}&commandname=${updateModuleName}&state=${targetState}`)
             console.log("Response: "+response);
         }
+        async function addTemplatedResponse(prompt, response, enabled) {
+            var storage = document.getElementById("responseStorage")
+            var clone = document.getElementById("responseDisplayTemplate").cloneNode(true)
+            if (enabled) {
+                clone.children[0].src = "Images/siteassets/switchon.png"
+            } else {
+                clone.children[0].src = "Images/siteassets/switchoff.png"
+            }
+            clone.children[4].innerHTML = `Prompt: <label style="color:lime">${prompt}<label/>`
+            clone.children[6].innerHTML = `Response: <label style="color:lime">${response}<label/>`
+            clone.id = `customtemplateresponse`
+            clone.removeAttribute("hidden")
+            var infield = storage.children[storage.children.length - 1]
+            var pretop = parseFloat(infield.style.top.split("px"));
+            if (infield.id != "responseDisplayTemplate" && infield.id != "responseAdd") {
+                clone.style.top = `${pretop + 75}px`
+                document.getElementById("responseAdd").style.top = `${pretop + (75 * 2)}px`
+                var prestore = parseFloat(document.getElementById("responseStorage").style.height.split("px"));
+                if (parseFloat(clone.style.top.split("px")) >= 165) {
+                    document.getElementById("responseStorage").style.height = `${prestore + 75}px`
+                }
+            } else {
+                document.getElementById("responseAdd").style.top = `${pretop + 75}px`
+            }
+            storage.appendChild(clone)
+        }
+        function FindChildByType(element, name) {
+            for (var i = 0; i < element.children.length; i++) {
+                var child = element.children[i]
+                if (child != undefined && child.nodeName.toLowerCase() == name.toLowerCase()) return child
+            }
+            return undefined
+        }
+        function FindChildById(element, name) {
+            for (var i = 0; i < element.children.length; i++) {
+                var child = element.children[i]
+                if (child != undefined && child.id.toLowerCase() == name.toLowerCase()) return child
+            }
+            return undefined
+        }
+        async function addResponse(element) {
+            var serverid = this.document.URL.split("id=")[1];
+            var prompts = element.children[1].value
+            var responseval = element.children[4].value
+            var response = await SendHTTPGet(`/addResponse?id=${serverid}&prompts="${prompts}"&response="${response}"`)
+            console.log("Response: " + response);
+            if (response.includes("[Success]")) {
+                addTemplatedResponse(prompts, responseval, true)
+            } else if (parseFloat(element.style.height.split("px")) < 125) {
+                var breakline = document.createElement("br")
+                var label = document.createElement("label")
+                label.style.opacity = 1;
+                label.classList.toggle("show", true)
+                label.style.color = "red";
+                label.innerText = response.split("[Failure] ")[1].split(")")[0].split("(")[1]
+                var pheight = parseFloat(element.style.height.split("px"))
+                element.style.height = `${pheight+20}px`
+                element.appendChild(breakline)
+                element.appendChild(label)
+                setTimeout(() => {
+                    var pheight = parseFloat(element.style.height.split("px"))
+                    element.style.height = `${pheight-20}px`
+                    label.remove()
+                    breakline.remove()
+                },3000)
+            }
+        }
+        async function toggleResponse(element) {
+            var serverid = this.document.URL.split("id=")[1];
+            var prompt = element.parentNode.children[4].innerText.substring(element.parentNode.children[4].innerText.indexOf(' ') + 1)
+            var baseurl = document.baseURI.split("/").splice(0, 3).join("/")
+            var targetState = element.src == baseurl + "/Images/siteassets/switchoff.png"
+            var res = await SendHTTPGet(`/updateResponse?id=${serverid}&prompt="${prompt}"&state=${targetState}`).catch(e => { })
+            console.log(res)
+            if (res.includes("[Success]")) {
+                if (targetState) {
+                    element.src = "Images/siteassets/switchon.png"
+                } else {
+                    element.src = "Images/siteassets/switchoff.png"
+                }
+            }
+        }
+        async function removeResponse(element) {
+            var serverid = this.document.URL.split("id=")[1];
+            var prompt = element.parentNode.children[4].innerText.substring(element.parentNode.children[4].innerText.indexOf(' ') + 1)
+            var res = await SendHTTPGet(`/removeResponse?id=${serverid}&prompt="${prompt}"`).catch(e => { })
+            if (res.includes("[Success]")) {
+                for (var i = 0; i < document.getElementById("responseStorage").children.length; i++) {
+                    var response = document.getElementById("responseStorage").children[i];
+                    if (response != null && response != undefined && response.id.includes("customtemplateresponse")) {
+                        response.remove()
+                    }
+                }
+                element.parentNode.remove()
+                document.getElementById("responseAdd").style.top = "15px"
+                LoadAllResponses(serverid)
+            }
+        }
         function eventSwitch(element) {
             var eventList = document.getElementById("moduleStorage")
             var commandList = document.getElementById("commandStorage")
+            var response = document.getElementById("responseStorage")
             eventList.removeAttribute("hidden")
             commandList.setAttribute("hidden", "")
+            response.setAttribute("hidden", "")
             document.getElementById("eventTab").onclick = function () { }
             document.getElementById("eventTab").style.cursor = "default"
+            document.getElementById("eventTab").children[0].style.cursor = "default"
+            document.getElementById("eventTab").children[0].onclick = function () { }
             document.getElementById("commandTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
             document.getElementById("commandTab").style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("responseTab").onclick = function () { responseSwitch(document.getElementById("responseTab")) }
+            document.getElementById("responseTab").style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].onclick = function () { responseSwitch(document.getElementById("responseTab")) }
         }
         function commandSwitch(element) {
             var eventList = document.getElementById("moduleStorage")
             var commandList = document.getElementById("commandStorage")
+            var response = document.getElementById("responseStorage")
             commandList.removeAttribute("hidden")
             eventList.setAttribute("hidden", "")
+            response.setAttribute("hidden", "")
             document.getElementById("eventTab").onclick = function () { eventSwitch(document.getElementById("eventTab")) }
             document.getElementById("eventTab").style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].onclick = function () { eventSwitch(document.getElementById("eventTab")) }
             document.getElementById("commandTab").onclick = function () { }
             document.getElementById("commandTab").style.cursor = "default"
+            document.getElementById("commandTab").children[0].style.cursor = "default"
+            document.getElementById("commandTab").children[0].onclick = function () { }
+            document.getElementById("responseTab").onclick = function () { responseSwitch(document.getElementById("responseTab")) }
+            document.getElementById("responseTab").style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].onclick = function () { responseSwitch(document.getElementById("responseTab")) }
+        }
+        function responseSwitch(element) {
+            var eventList = document.getElementById("moduleStorage")
+            var commandList = document.getElementById("commandStorage")
+            var response = document.getElementById("responseStorage")
+            commandList.setAttribute("hidden", "")
+            eventList.setAttribute("hidden", "")
+            response.removeAttribute("hidden")
+            document.getElementById("eventTab").onclick = function () { eventSwitch(document.getElementById("eventTab")) }
+            document.getElementById("eventTab").style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].onclick = function () { eventSwitch(document.getElementById("eventTab")) }
+            document.getElementById("commandTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("commandTab").style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("responseTab").onclick = function () { }
+            document.getElementById("responseTab").style.cursor = "default"
+            document.getElementById("responseTab").children[0].style.cursor = "default"
+            document.getElementById("responseTab").children[0].onclick = function () { }
         }
     </script>
     <div>
-        <fieldset id="eventTab" onclick="eventSwitch(this)" style="cursor: pointer; left: 10vw; top: 100px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray;text-align:center;"><label class="profileElement" style="top:20px">Event<br />Settings</label></fieldset>
-        <fieldset id="commandTab" style="left: 10vw; top: 225px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center;"><label class="profileElement" style="top:20px">Command<br />Settings</label></fieldset>
-        <fieldset id="moduleStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:auto;min-height:300px;left:20vw; top:100px">
+        <fieldset id="eventTab" onclick="eventSwitch(this)" style="cursor: pointer; left: 150px; top: 100px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align: center; cursor: pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Event<br />Settings</label></fieldset>
+        <fieldset id="commandTab" style="left: 150px; top: 225px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center;"><label class="profileElement" style="top:20px">Command<br />Settings</label></fieldset>
+        <fieldset id="responseTab" onclick="responseSwitch(this)"  style="left: 150px; top: 350px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center; cursor:pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Chat<br />Responses</label></fieldset>
+        <fieldset id="moduleStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:300px;min-height:300px;left:370px; top:100px">
             <fieldset id="moduleTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
-                <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateModule(this.parentNode)"> <!--Placeholder!-->
+                <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateModule(this.parentNode)">
                 <label>Name: TestModule</label>
             </fieldset>
         </fieldset>
-        <fieldset id="commandStorage" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:290px;min-height:290px;left:20vw; top:100px">
-            <fieldset id="commandTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
-                <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateCommand(this.parentNode)"> <!--Placeholder!-->
+        <fieldset id="commandStorage" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:290px;min-height:290px;left:370px; top:100px">
+            <fieldset id="commandTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;height:50px;min-width:500px;top:15px;width:max-content;">
+                <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateCommand(this.parentNode)">
                 <label>Name: TestModule</label>
+            </fieldset>
+        </fieldset>
+        <fieldset id="responseStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:290px;min-height:290px;left:370px; top:100px">
+            <fieldset id="responseDisplayTemplate" hidden="" style="fill-opacity:99;opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;height:50px;min-width:500px;top:15px;width:max-content;">
+                <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="toggleResponse(this)">
+                <label>&nbsp</label>
+                <input type="button" value="Delete Response" style="background:none;border-color:red;" onclick="removeResponse(this)" />
+                <br />
+                <label>Prompt: Test, Response</label>
+                <br />
+                <label>Response: Fuck this shit im out!</label>
+            </fieldset>
+            <fieldset id="responseAdd" style="fill-opacity: 99; opacity: 1; border: solid; border-color: black; background-color: gray; position: absolute; z-index: 101; border-radius: 7px; height: 60px; top:15px; min-width: 500px; width: max-content;">
+                <label>Prompts: </label><input title="This is a list of prompts that the bot in this server should listen for. Prompts are seperated by (,)" type="text" />
+                <br />
+                <label>Response: </label><input title="This is the response to any of the prompts. (You cannot have multiple responses!)" type="text" />
+                <br />
+                <input type="button" value="Add Response" onclick="addResponse(this.parentElement)" style="border-radius:5px" />
             </fieldset>
         </fieldset>
     </div>
