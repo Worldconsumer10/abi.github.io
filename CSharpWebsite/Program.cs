@@ -136,7 +136,7 @@ app.MapGet("/banned", async (HttpContext context) =>
 #endregion
 
 #region AccountRelated
-List<Tuple<int, string>> ServerStorage = new List<Tuple<int, string>>();
+List<ServerStorage> ServerStorage = new List<ServerStorage>();
 app.MapGet("/submitLogin", async (HttpContext context, string email, string password) =>
 {
     if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Input)"); return; }
@@ -174,14 +174,6 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     getUser.lockRetries = 3;
     await getUser.Update();
     var userIndex = new Random().Next(int.MinValue, int.MaxValue);
-    if (!ServerStorage.Any(s => s.Item2.ToLower() == decryptedEmail.ToLower()))
-    {
-        ServerStorage.Add(Tuple.Create(userIndex, decryptedEmail));
-    }
-    else
-    {
-        ServerStorage[ServerStorage.FindIndex(s => s.Item2.ToLower() == decryptedEmail.ToLower())] = Tuple.Create(userIndex, decryptedEmail);
-    }
     var highestperm = 0;
     if (getUser.WebsiteOverride == null)
     {
@@ -195,6 +187,25 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     else
     {
         highestperm = (int)getUser.WebsiteOverride;
+    }
+    if (!ServerStorage.Any(s => s.email.ToLower() == decryptedEmail.ToLower()))
+    {
+        ServerStorage.Add(new ServerStorage()
+        {
+            email = decryptedEmail,
+            id = new Random().NextInt64(long.MinValue, long.MaxValue),
+            permissionLevel = highestperm
+        });
+    }
+    else
+    {
+        var storage = ServerStorage.Find(s => s.email.ToLower() == decryptedEmail.ToLower()) ?? new ServerStorage();
+        ServerStorage[ServerStorage.FindIndex(s => s.email.ToLower() == decryptedEmail.ToLower())] = new ServerStorage()
+        {
+            id = storage.id,
+            email = decryptedEmail,
+            permissionLevel = highestperm
+        };
     }
     await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
@@ -215,9 +226,9 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
     try
     {
         var idi = int.Parse(id);
-        var storage = ServerStorage.Find(t => t.Item1 == idi && t.Item2 == email);
+        var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        var user = await WebsiteSchema.Get(storage.Item2);
+        var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         if (!user.permissionLevel.Any(l => l.userLevel >= requiredServer)) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfiglist.html");
@@ -233,9 +244,9 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
     try
     {
         var idi = int.Parse(id);
-        var storage = ServerStorage.Find(t => t.Item1 == idi && t.Item2 == email);
+        var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        var user = await WebsiteSchema.Get(storage.Item2);
+        var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         List<ServerOverviewList> lsits = new List<ServerOverviewList>();
         var serverlists = user.permissionLevel.Where(u => u.userLevel >= requiredServer);
@@ -370,16 +381,16 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
     var jsonResult = JsonSerializer.Deserialize<UserResponse>(json);
     if (jsonResult != null)
     {
-        var element = ServerStorage.Find(s => s.Item1 == jsonResult.sessionId);
+        var element = ServerStorage.Find(s => s.id == jsonResult.sessionId);
         if (element != null && jsonResult != null)
         {
-            if (element.Item2.ToLower() == jsonResult.email.ToLower())
+            if (element.email.ToLower() == jsonResult.email.ToLower())
             {
                 await ContextResponse.RespondAsync(context.Response, "Verified");
             }
             else
             {
-                var gu = await WebsiteSchema.Get(element.Item2);
+                var gu = await WebsiteSchema.Get(element.email);
                 if (gu != null)
                 {
                     gu.IsBanned = true;
@@ -407,9 +418,9 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
     try
     {
         var idd = int.Parse(id);
-        var target_email = ServerStorage.Find(s => s.Item1 == idd);
-        if (target_email == null || target_email.Item2 != email) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Incorrect Email Recieved!)"); return; }
-        var userDetails = await WebsiteSchema.Get(target_email.Item2);
+        var target_email = ServerStorage.Find(s => s.id == idd);
+        if (target_email == null || target_email.email != email) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Incorrect Email Recieved!)"); return; }
+        var userDetails = await WebsiteSchema.Get(target_email.email);
         if (userDetails == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Not Registered!)"); return; }
         var highestperm = 0;
         var highestpermlist = userDetails.permissionLevel;
@@ -491,25 +502,25 @@ app.MapGet("/setNewPassword", async (HttpContext context, string id, string pass
 List<ResetRequest> closeRequest = new List<ResetRequest>();
 app.MapPost("/editUser", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    var storage = ServerStorage.Find(s => s.id.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/useredit.html");
 });
 app.MapPost("/closeAccount", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    var storage = ServerStorage.Find(s => s.id.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
+    ServerStorage.RemoveAll(s => s.id.ToString() == id);
     var request = new ResetRequest()
     {
         _id = new Random().NextInt64(long.MinValue, long.MaxValue),
-        email = storage.Item2,
+        email = storage.email,
         requestDate = DateTime.Now
     };
     closeRequest.Add(request);
     string ResetLink = $"{GetBaseUrl(context)}/emailclose?code={request._id}";
-    string Body = $"Dear {storage.Item2}<br/>I have recieved a request for your account to be terminated!<br/>Fear not! Closing your account can be done by just following this link:<br/>{ResetLink}<br/><i>If you did not do this action, please reset your password immediately!<i/><br/><br/>This is an automated message! Do not reply!";
-    SendEmail(storage.Item2, "Account Close Request", Body);
+    string Body = $"Dear {storage.email}<br/>I have recieved a request for your account to be terminated!<br/>Fear not! Closing your account can be done by just following this link:<br/>{ResetLink}<br/><i>If you did not do this action, please reset your password immediately!<i/><br/><br/>This is an automated message! Do not reply!";
+    SendEmail(storage.email, "Account Close Request", Body);
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
 });
 app.MapGet("/emailclose", async (HttpContext context, string id) =>
@@ -524,10 +535,10 @@ app.MapGet("/emailclose", async (HttpContext context, string id) =>
 });
 app.MapPost("/lockAccount", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    var storage = ServerStorage.Find(s => s.id.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
-    var user = await WebsiteSchema.Get(storage.Item2);
+    ServerStorage.RemoveAll(s => s.id.ToString() == id);
+    var user = await WebsiteSchema.Get(storage.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
     user.lockDate = DateTime.Now;
     user.lockRetries = 0;
@@ -536,29 +547,29 @@ app.MapPost("/lockAccount", async (HttpContext context, string id) =>
     user.resetCode = keys[new Random().Next(keys.Count)];
     await user.Update();
     string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={user.resetCode}";
-    string Body = $"Dear {storage.Item2}<br/>As per your request your account has been locked! If you wish to unlock your account follow this link to restore it:<br/>{ResetLink}<br/>Or use the code: {user.resetCode}<br/>When attempting to login next!<br/><br/><br/>This is an automated message! Do not reply!";
-    SendEmail(storage.Item2, "Account Locked", Body);
+    string Body = $"Dear {storage.email}<br/>As per your request your account has been locked! If you wish to unlock your account follow this link to restore it:<br/>{ResetLink}<br/>Or use the code: {user.resetCode}<br/>When attempting to login next!<br/><br/><br/>This is an automated message! Do not reply!";
+    SendEmail(storage.email, "Account Locked", Body);
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
 });
 app.MapPost("/resetPasswordR", async (HttpContext context, string id) =>
 {
     resetRequests.RemoveAll(r => r.requestDate.AddMinutes(30) < DateTime.Now);
-    var storage = ServerStorage.Find(s => s.Item1.ToString() == id);
+    var storage = ServerStorage.Find(s => s.id.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.Item1.ToString() == id);
-    if (resetRequests.Any(r => r.email == storage.Item2))
+    ServerStorage.RemoveAll(s => s.id.ToString() == id);
+    if (resetRequests.Any(r => r.email == storage.email))
     {
-        resetRequests.RemoveAll(r => r.email == storage.Item2);
+        resetRequests.RemoveAll(r => r.email == storage.email);
     }
     var resetRequest = new ResetRequest()
     {
-        email = storage.Item2,
+        email = storage.email,
         requestDate = DateTime.Now,
         _id = new Random().NextInt64(long.MinValue, long.MaxValue)
     };
     resetRequests.Add(resetRequest);
     var resetUrl = $"{GetBaseUrl(context)}/resetPassword?id={resetRequest._id}";
-    SendEmail(storage.Item2, "Account Password Reset", $"Hi {storage.Item2},<br/>I have recieved your request for a password reset!<br/>Lets get that underway shall we?<br/>I just need you to follow this link to reset your password<br/><br/>{resetUrl}<br/><br/><i>If you did not do this action, please disregard this email! The request will time out after 30 minutes<i/><br/>This is an automated message! Do not reply!");
+    SendEmail(storage.email, "Account Password Reset", $"Hi {storage.email},<br/>I have recieved your request for a password reset!<br/>Lets get that underway shall we?<br/>I just need you to follow this link to reset your password<br/><br/>{resetUrl}<br/><br/><i>If you did not do this action, please disregard this email! The request will time out after 30 minutes<i/><br/>This is an automated message! Do not reply!");
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
 });
 #endregion
@@ -614,6 +625,13 @@ void SendEmail(string email, string subject, string body)
     message.IsBodyHtml = true;
     message.Body = body;
     smtpClient.Send(message);
+}
+
+internal class ServerStorage
+{
+    public long id { get; set; } = new Random().NextInt64(long.MinValue, long.MaxValue);
+    public string email { get; set; } = "fucking.failed@fuck.com";
+    public int permissionLevel { get; set; } = 0;
 }
 
 //just adds a respondasync option that prevents errors because of an incorrect return.
