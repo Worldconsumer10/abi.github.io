@@ -145,6 +145,10 @@
                 console.log(response)
                 var json = JSON.parse(response);
                 if (json == null) return;
+                var entry = 0;
+                var line = 0;
+                var baseline = 30 / ((clamp(json.length, 0, 4) / 4) * 6)
+                console.log(`Base: 30, Servers: ${json.length}, Divider: ${(clamp(json.length, 0, 4) / 4)}, Final Divider: ${(clamp(json.length, 0, 4) / 4) * 6}, Resulted Baseline: ${baseline}`)
                 for (var i = 0; i < json.length; i++) {
                     var server = json[i];
                     if (server == undefined) continue;
@@ -153,7 +157,13 @@
                     clone.removeAttribute("hidden")
                     clone.setAttribute("id", server.server.Id)
                     clone.children[2].innerText = server.Name
-                    clone.style.left = `${clamp(35 + (15 * i), 35, 500)}vw`
+                    entry++;
+                    if (entry > 4) {
+                        line++;
+                        entry = 1;
+                    }
+                    clone.style.left = `${clamp(baseline + (15 * entry), 0, 500)}vw`
+                    clone.style.top = `${150 + (200 * line)}px`
                     document.getElementById("serverDivider").appendChild(clone)
                 }
             }

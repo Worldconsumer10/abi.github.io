@@ -190,24 +190,30 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     }
     if (!ServerStorage.Any(s => s.email.ToLower() == decryptedEmail.ToLower()))
     {
-        ServerStorage.Add(new ServerStorage()
+        var nstorage = new ServerStorage()
         {
             email = decryptedEmail,
-            id = new Random().NextInt64(long.MinValue, long.MaxValue),
+            id = userIndex,
             permissionLevel = highestperm
-        });
+        };
+        ServerStorage.Add(nstorage);
+        Console.WriteLine($"New Session Started For: {decryptedEmail} (ID: {userIndex})");
+        await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     }
     else
     {
         var storage = ServerStorage.Find(s => s.email.ToLower() == decryptedEmail.ToLower()) ?? new ServerStorage();
-        ServerStorage[ServerStorage.FindIndex(s => s.email.ToLower() == decryptedEmail.ToLower())] = new ServerStorage()
+        var nstorage = new ServerStorage()
         {
-            id = storage.id,
+            id = userIndex,
             email = decryptedEmail,
             permissionLevel = highestperm
         };
+        ServerStorage[ServerStorage.FindIndex(s => s.email.ToLower() == decryptedEmail.ToLower())] = nstorage;
+        Console.WriteLine($"Session Overwritten For: {decryptedEmail} (ID: {userIndex})");
+        Console.WriteLine($"Session ID: {userIndex}");
+        await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     }
-    await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
 });
 app.MapGet("/emailverification", async (HttpContext context, string code) =>
@@ -225,7 +231,7 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
 {
     try
     {
-        var idi = int.Parse(id);
+        var idi = LongParse(id);
         var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
@@ -243,7 +249,7 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
 {
     try
     {
-        var idi = int.Parse(id);
+        var idi = LongParse(id);
         var storage = ServerStorage.Find(t => t.id == idi && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
@@ -272,7 +278,7 @@ app.MapGet("/getServerDetails", async (HttpContext context, string id) =>
 {
     try
     {
-        ulong idd = ulong.Parse(id);
+        ulong idd = ULongParse(id);
         var server = await GuildServer.Get(idd);
         if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
         await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(server));
@@ -283,7 +289,7 @@ app.MapGet("/updateModule", async (HttpContext context, string id, string module
 {
     try
     {
-        ulong idd = ulong.Parse(id);
+        ulong idd = ULongParse(id);
         var server = await GuildServer.Get(idd);
         if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
         var module = server.eventModules.Find(m => m.Name == moduleName);
@@ -300,7 +306,7 @@ app.MapGet("/updateCommand", async (HttpContext context, string id, string comma
 {
     try
     {
-        ulong idd = ulong.Parse(id);
+        ulong idd = ULongParse(id);
         var server = await GuildServer.Get(idd);
         if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
         var module = server.commands.Find(m => m.command_name == commandname);
@@ -317,7 +323,7 @@ app.MapPost("/loadServerConfig", async (HttpContext context, string id) =>
 {
     try
     {
-        ulong idd = ulong.Parse(id);
+        ulong idd = ULongParse(id);
         var server = await GuildServer.Get(idd);
         if (server == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfig.html");
@@ -417,8 +423,7 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
 {
     try
     {
-        var idd = int.Parse(id);
-        var target_email = ServerStorage.Find(s => s.id == idd);
+        var target_email = ServerStorage.Find(s => s.id.ToString() == id);
         if (target_email == null || target_email.email != email) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Incorrect Email Recieved!)"); return; }
         var userDetails = await WebsiteSchema.Get(target_email.email);
         if (userDetails == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Not Registered!)"); return; }
@@ -502,9 +507,16 @@ app.MapGet("/setNewPassword", async (HttpContext context, string id, string pass
 List<ResetRequest> closeRequest = new List<ResetRequest>();
 app.MapPost("/editUser", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.id.ToString() == id);
-    if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    await FileServerMiddleware.ReplyFile(context, "Content/Pages/useredit.html");
+    try
+    {
+        var storage = ServerStorage.Find(s => s.id.ToString() == id);
+        if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/useredit.html");
+    }
+    catch (Exception e)
+    {
+        await ContextResponse.RespondAsync(context.Response, $"[Failure] ({e.Message}\n{e.Source}\n\n{e.StackTrace})"); return;
+    }
 });
 app.MapPost("/closeAccount", async (HttpContext context, string id) =>
 {
@@ -596,6 +608,23 @@ app.MapRazorPages();
 
 app.Run();
 
+long LongParse(string s)
+{
+    long nl = 0;
+    ulong nul = 0;
+    var res = ulong.TryParse(s, out nul);
+    if (res) return long.MaxValue;
+    long.TryParse(s, out nl);
+    return nl;
+}
+ulong ULongParse(string s)
+{
+    ulong nul = 0;
+    var res = ulong.TryParse(s, out nul);
+    if (res) return nul;
+    return ulong.MaxValue;
+}
+
 string GetBaseUrl(HttpContext context, bool includePort = true)
 {
     var host = context.Request.Host.Host;
@@ -629,7 +658,7 @@ void SendEmail(string email, string subject, string body)
 
 internal class ServerStorage
 {
-    public long id { get; set; } = new Random().NextInt64(long.MinValue, long.MaxValue);
+    public int id { get; set; } = new Random().Next(int.MinValue, int.MaxValue);
     public string email { get; set; } = "fucking.failed@fuck.com";
     public int permissionLevel { get; set; } = 0;
 }
@@ -674,7 +703,7 @@ public class UserDetailsResponse
 public class UserResponse
 {
     public string email { get; set; }
-    public int sessionId { get; set; }
+    public long sessionId { get; set; }
     public string URLThumbnail { get; set; }
     public int permissionLevel { get; set; }
 }

@@ -214,10 +214,13 @@
             var protab = document.getElementById("ProfileTab")
             var editServers = document.getElementById("editServers")
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            var jsonraw = sessionStorage.getItem("SessionDetails")
             //showing profile settings option
             profilesettings.style.opacity = 1;
             profilesettings.classList.toggle("show", true)
-            profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${json.sessionId}`).then((r) => { }).catch((e) => { }) }
+            console.log(sessionStorage.getItem("SessionDetails"))
+            var sessionId = jsonraw.split(",")[1].split(":")[1]
+            profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${sessionId}`).then((r) => { }).catch((e) => { }) }
             login.parentElement.style.right = "175px"
             editServers.parentElement.style.right = "242.5px";
             //rest of shit
@@ -382,6 +385,7 @@
                 var json = result.split(") ")[1]
                 if (isJson(json)) {
                     var jsonResult = JSON.parse(json)
+                    console.log(json)
                     console.log("[INFO] This is a note for all you wannabe-hackers.. i stored the logged in email address in the sessionStorage. Fuck around with this as much as you like it will be verified server-side anyway. Also dont modify it. This verification can have your account banned if you modified the sessionStorage")
                     sessionStorage.setItem("SessionDetails", json)
                     var profilesettings = document.getElementById("editProfile").parentElement
@@ -550,9 +554,10 @@
                             element.lastElementChild.firstElementChild.appendChild(rudelabel)
                         }
                     }
-                } else {
+                } else if (!document.getElementById("profileeerrorms")) {
                     var emaillabel = document.createElement("label")
-                    emaillabel.innerText = "This is an Error.."
+                    emaillabel.innerHTML = `Error Caused From Response:<br/><label style="color:red">${userDetails}<label/>`
+                    emaillabel.id="profileeerrormsg"
                     emaillabel.classList.add("profileElement")
                     element.lastElementChild.firstElementChild.appendChild(emaillabel)
                 }

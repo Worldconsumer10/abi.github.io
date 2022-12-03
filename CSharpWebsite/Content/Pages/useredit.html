@@ -104,13 +104,14 @@
 <body style="background-color:rgb(50,50,50); color:white">
     <div class="TopBar">
     </div>
+    <fieldset class="TopBarElement" style="border:solid;border-color:lime;border-radius:7px;top:10px;font:bold;font-size:15px;user-select:none;cursor:pointer" onclick="ReturnToList(this)">Back To Homepage</fieldset>
     <fieldset id="userfield" style="text-align:center;border-radius:10px;border-color:black;background-color:gray;left:35vw;top:200px;position:absolute;min-width:600px;min-height:100px;">
         <label id="email" style="font-size: 20px">Email: Unknown</label>
         <br />
         <label id="permlevel" style="font-size: 20px">Permission Level: Basic</label>
         <br />
         <label id="websiteperm" hidden="" style="font-size: 20px">Website Overrride Permission Level: Basic</label>
-        <br id="websitepermbreak"/>
+        <br id="websitepermbreak" />
         <label id="ispaired" style="font-size: 20px">Is Paired: false</label>
         <br />
         <label id="pairedwith" style="font-size: 20px">Paired With: Unknown</label>
@@ -123,6 +124,9 @@
         <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" type="button" value="Request Password Reset" onclick="ResetPassword(this.parentElement)" />
     </fieldset>
     <script lang="en" language="javascript">
+        async function ReturnToList(element) {
+            await SendHTTPPost(`/`);
+        }
         window.onload = async function () {
             var userfield = document.getElementById("userfield")
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
