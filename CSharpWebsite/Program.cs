@@ -171,6 +171,8 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
         await getUser.Update();
         return;
     }
+    getUser.lockRetries = 3;
+    await getUser.Update();
     var userIndex = new Random().Next(int.MinValue, int.MaxValue);
     if (!ServerStorage.Any(s => s.Item2.ToLower() == decryptedEmail.ToLower()))
     {
