@@ -14,6 +14,7 @@ namespace CSharpWebsite.Content.Database
         public string URLThumbnail { get; set; } = string.Empty;
         public bool IsLocked { get; set; } = false;
         public bool IsPaired { get; set; } = false;
+        public int? WebsiteOverride { get; set; } = null;
         public bool IsBanned { get; set; } = false;
         public bool IsVerified { get; set; } = false;
         public DateTime creationDate { get; set; } = DateTime.Now;

@@ -104,23 +104,160 @@
 <body style="background-color:rgb(50,50,50); color:white">
     <div class="TopBar">
     </div>
-    <fieldset id="resetfield" style="text-align:center;border-radius:10px;border-color:black;background-color:gray;left:35vw;top:200px;position:absolute;min-width:600px;min-height:100px;">
-        <label style="font-size: 20px">Email: Unknown</label>
+    <fieldset id="userfield" style="text-align:center;border-radius:10px;border-color:black;background-color:gray;left:35vw;top:200px;position:absolute;min-width:600px;min-height:100px;">
+        <label id="email" style="font-size: 20px">Email: Unknown</label>
         <br />
-        <label style="font-size: 20px">Highest Permission Level: Unknown</label>
+        <label id="permlevel" style="font-size: 20px">Permission Level: Basic</label>
         <br />
-        <label style="font-size: 20px">Is Paired: false</label>
+        <label id="websiteperm" hidden="" style="font-size: 20px">Website Overrride Permission Level: Basic</label>
+        <br id="websitepermbreak"/>
+        <label id="ispaired" style="font-size: 20px">Is Paired: false</label>
         <br />
-        <label style="font-size: 20px">Paired With: Unknown</label>
+        <label id="pairedwith" style="font-size: 20px">Paired With: Unknown</label>
         <br />
         <br />
         <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white" type="button" value="Close Account" onclick="CloseAccount(this.parentElement)" />
         <br />
-        <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white " type="button" value="Lock Account" onclick="LockAccount(this.parentElement)"/>
+        <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white" type="button" value="Lock Account" onclick="LockAccount(this.parentElement)" />
         <br />
-        <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" type="button" value="Request Password Reset" onclick="ResetPassword(this.parentElement)"/>
+        <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" type="button" value="Request Password Reset" onclick="ResetPassword(this.parentElement)" />
     </fieldset>
     <script lang="en" language="javascript">
+        window.onload = async function () {
+            var userfield = document.getElementById("userfield")
+            var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+            var response = await SendHTTPGet(`/userDetails?id=${json.sessionId}&email=${json.email}`).catch(e => { console.error(e) })
+            var resjson = JSON.parse(response.substring(response.indexOf(' ') + 1))
+            console.log(response)
+            for (var i = 0; i < userfield.children.length; i++) {
+                var child = userfield.children[i];
+                if (child == null) continue;
+                if (child.id == "") continue;
+                var permissionLevel = "Basic";
+                var permissioncolor = "red"
+                var webperm = "None";
+                var webcolor = "red";
+                if (resjson != undefined && resjson != null) {
+                    switch (resjson.permissionLevel) {
+                        case 1:
+                            permissionLevel = "Moderate";
+                            permissioncolor = "darkorange";
+                            break;
+                        case 2:
+                            permissionLevel = "Advanced";
+                            permissioncolor = "orange";
+                            break;
+                        case 3:
+                            permissionLevel = "High";
+                            permissioncolor = "green";
+                            break;
+                        case 4:
+                            permissionLevel = "Highest";
+                            permissioncolor = "lime";
+                            break;
+                        default:
+                            break;
+                    }
+                    if (resjson.webPermLevel > 0) {
+                        switch (resjson.webPermLevel) {
+                            case 1:
+                                webperm = "Moderate";
+                                permissioncolor = "darkorange";
+                                break;
+                            case 2:
+                                webperm = "Advanced";
+                                webcolor = "orange";
+                                break;
+                            case 3:
+                                webperm = "High";
+                                webcolor = "green";
+                                break;
+                            case 4:
+                                webperm = "Highest";
+                                webcolor = "lime";
+                                break;
+                            default:
+                                webperm = "Highest";
+                                webcolor = "lime";
+                                break;
+                        }
+                    }
+                }
+                if (resjson.user != null && resjson.user != undefined) {
+                    switch (child.id) {
+                        case "email":
+                            child.innerText = "Email: " + json.email
+                            break;
+                        case "permlevel":
+                            child.innerHTML = `Permission Level: <label style="color:${permissioncolor}">${permissionLevel}<label/>`
+                            break;
+                        case "ispaired":
+                            child.innerHTML = `Is Paired: <label style="color:lime">Yes<label/>`
+                            break;
+                        case "websiteperm":
+                            if (webperm == "None") break;
+                            child.innerHTML = `Website Overrride Permission Level: <label style="color:${webcolor}">${webperm}<label/>`
+                            child.removeAttribute("hidden")
+                            break;
+                        case "websitepermbreak":
+                            if (webperm != "None") break;
+                            child.remove()
+                            break;
+                        case "pairedwith":
+                            child.innerText = "Paired With: " + resjson.user.Name
+                            break;
+                        default:
+                            break;
+                    }
+                } else if (resjson != null && resjson != undefined) {
+                    switch (child.id) {
+                        case "email":
+                            child.innerText = "Email: " + json.email
+                            break;
+                        case "permlevel":
+                            child.innerHTML = `Permission Level: <label style="color:${permissioncolor}">${permissionLevel}<label/>`
+                            break;
+                        case "ispaired":
+                            child.innerHTML = `Is Paired: <label style="color:red">No<label/>`
+                            break;
+                        case "websiteperm":
+                            if (webperm == "None") break;
+                            child.innerHTML = `Website Overrride Permission Level: <label style="color:${webcolor}">${webperm}<label/>`
+                            child.removeAttribute("hidden")
+                            break;
+                        case "websitepermbreak":
+                            if (webperm != "None") break;
+                            child.remove()
+                            break;
+                        default:
+                            break;
+                    }
+                } else {
+                    switch (child.id) {
+                        case "email":
+                            child.innerText = "Email: " + json.email
+                            break;
+                        case "permlevel":
+                            child.innerHTML = `Permission Level: <label style="color:${permissioncolor}">${permissionLevel}<label/>`
+                            break;
+                        case "ispaired":
+                            child.innerHTML = `Is Paired: <label style="color:red">No<label/>`
+                            break;
+                        case "websiteperm":
+                            if (webperm == "None") break;
+                            child.innerHTML = `Permission Level: <label style="color:${webcolor}">${webperm}<label/>`
+                            child.removeAttribute("hidden")
+                            break;
+                        case "websitepermbreak":
+                            if (webperm != "None") break;
+                            child.remove()
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
         function SendHTTPGet(connection) {
             return new Promise((resolve, reject) => {
                 fetch(connection).then(function (response) {

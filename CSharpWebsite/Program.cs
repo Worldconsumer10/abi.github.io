@@ -182,12 +182,19 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     {
         ServerStorage[ServerStorage.FindIndex(s => s.Item2.ToLower() == decryptedEmail.ToLower())] = Tuple.Create(userIndex, decryptedEmail);
     }
-    var highestpermlist = getUser.permissionLevel;
-    highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
     var highestperm = 0;
-    if (highestpermlist.Count > 0)
+    if (getUser.WebsiteOverride == null)
     {
-        highestperm = highestpermlist[0].userLevel;
+        var highestpermlist = getUser.permissionLevel;
+        highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
+        if (highestpermlist.Count > 0)
+        {
+            highestperm = highestpermlist[0].userLevel;
+        }
+    }
+    else
+    {
+        highestperm = (int)getUser.WebsiteOverride;
     }
     await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = userIndex, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
     return;
@@ -404,8 +411,15 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
         if (target_email == null || target_email.Item2 != email) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Incorrect Email Recieved!)"); return; }
         var userDetails = await WebsiteSchema.Get(target_email.Item2);
         if (userDetails == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Not Registered!)"); return; }
+        var highestperm = 0;
+        var highestpermlist = userDetails.permissionLevel;
+        highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
+        if (highestpermlist.Count > 0)
+        {
+            highestperm = highestpermlist[0].userLevel;
+        }
         await ContextResponse.RespondAsync(context.Response, "[Success] " +
-            JsonSerializer.Serialize(new UserDetailsResponse() { pairCode = userDetails.pairCode, discordID = userDetails.DiscordId, profileURL = userDetails.URLThumbnail, servers = userDetails.permissionLevel, user = (await GuildUser.Get(userDetails.DiscordId ?? 0)) }));
+            JsonSerializer.Serialize(new UserDetailsResponse() { pairCode = userDetails.pairCode, discordID = userDetails.DiscordId, permissionLevel = highestperm, webPermLevel = userDetails.WebsiteOverride ?? 0, profileURL = userDetails.URLThumbnail, servers = userDetails.permissionLevel, user = (await GuildUser.Get(userDetails.DiscordId ?? 0)) }));
         return;
     }
     catch (Exception) { await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured!)"); return; }
@@ -634,6 +648,8 @@ public class UserDetailsResponse
     public string? pairCode { get; set; } = null;
     public ulong? discordID { get; set; } = null;
     public string profileURL { get; set; } = "Images/unknownprofliepic.png";
+    public int webPermLevel { get; set; } = 0;
+    public int permissionLevel { get; set; } = 0;
     public List<DiscordServer> servers { get; set; } = new List<DiscordServer>();
     public GuildUser? user { get; set; } = null;
 }
