@@ -154,11 +154,8 @@
             var email = emailinput.value
             if (email == null || email == undefined || email == "") { email = "None" }
             var response = await SendHTTPGet(`/submitResetRequest?email="${email}"`).catch(e => { })
-            console.log(response)
             var state = response.split("]")[0].split("[")[1]
             var message = response.split(")")[0].split("(")[1]
-            console.log(state)
-            console.log(message)
             if (state.includes("Success")) {
                 logintab.lastElementChild.style.color = "lime"
                 logintab.lastElementChild.style["text-shadow"] = "0.5px 0.5px green";
@@ -218,7 +215,6 @@
             //showing profile settings option
             profilesettings.style.opacity = 1;
             profilesettings.classList.toggle("show", true)
-            console.log(sessionStorage.getItem("SessionDetails"))
             var sessionId = jsonraw.split(",")[1].split(":")[1]
             profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${sessionId}`).then((r) => { }).catch((e) => { }) }
             login.parentElement.style.right = "175px"
@@ -293,7 +289,7 @@
         }
         function SendHTTPGet(connection) {
             return new Promise((resolve, reject) => {
-                fetch(connection).then(function (response) {
+                var res = fetch(connection).then(function (response) {
                     return response.json();
                 }).then(function (data) {
                     resolve(data.response);
@@ -302,8 +298,20 @@
                 });
             })
         }
-        function SendHTTPPost(connection, content) {
+        function SendHTTPPost(connection, header, content) {
+            var xhr = new XMLHttpRequest()
+            xhr.open('POST', connection, true)
+            xhr.setRequestHeader('Content-type', 'application/json')
+            xhr.send(content)
+            xhr.onload = function () {
+                if (xhr.status === 201) {
+                    console.log("Post successfully created!")
+                }
+            }
+        }
+        function OldSendHTTPPost(connection,header, content) {
             var fm = document.createElement("form")
+            if (header != undefined) { fm.setAttribute("header", header); }
             fm.setAttribute("method", "post")
             fm.setAttribute("action", connection)
             if (content != undefined) {
@@ -346,9 +354,7 @@
             element.lastElementChild.className = "hide"
             element.lastElementChild.setAttribute("hidden", "true")
             element.parentNode.parentNode.style.height = "200px";
-            console.log("Sending Creation Request");
             var result = await SendHTTPGet(`/createAccount?email=${email}&password=${password}`).catch(e => { })
-            console.log("Recieved Response");
             if (isJson(result)) {
                 var result = JSON.parse(result)
                 sessionStorage.setItem("Login", result)
@@ -385,7 +391,6 @@
                 var json = result.split(") ")[1]
                 if (isJson(json)) {
                     var jsonResult = JSON.parse(json)
-                    console.log(json)
                     console.log("[INFO] This is a note for all you wannabe-hackers.. i stored the logged in email address in the sessionStorage. Fuck around with this as much as you like it will be verified server-side anyway. Also dont modify it. This verification can have your account banned if you modified the sessionStorage")
                     sessionStorage.setItem("SessionDetails", json)
                     var profilesettings = document.getElementById("editProfile").parentElement
@@ -481,12 +486,14 @@
                     possibleNodes[0].setAttribute("src", "Images/unknownprofliepic.png")
                 }
                 var userDetails = await SendHTTPGet(`/userDetails?email=${json.email}&id=${json.sessionId}`).catch(e => { })
-                if (userDetails.includes("[Success]")) {
+                if (userDetails == undefined) {
+
+                } else if (userDetails.includes("[Success]")) {
                     var user = {}
                     try {
                         user = JSON.parse(userDetails.substring(userDetails.indexOf(' ') + 1))
                     } catch (e) { }
-                    if (user.discordID == null) {
+                    if (user.discordID == null) { //No paired with discord
                         var notpaired = document.createElement("label")
                         notpaired.innerText = "Not Paired"
                         notpaired.classList.add("profileElement")
@@ -501,7 +508,7 @@
                         pairnotif.innerText = "Please pair by running <a!pair " + json.pairCode + "> in any discord Anni is in!"
                         pairnotif.classList.add("profileElement")
                         element.lastElementChild.firstElementChild.appendChild(pairnotif)
-                    } else {
+                    } else { //Paired with discord
                         var emaillabel = document.createElement("label")
                         emaillabel.innerText = "Email: " + json.email
                         emaillabel.classList.add("profileElement")
@@ -557,7 +564,7 @@
                 } else if (!document.getElementById("profileeerrorms")) {
                     var emaillabel = document.createElement("label")
                     emaillabel.innerHTML = `Error Caused From Response:<br/><label style="color:red">${userDetails}<label/>`
-                    emaillabel.id="profileeerrormsg"
+                    emaillabel.id = "profileeerrormsg"
                     emaillabel.classList.add("profileElement")
                     element.lastElementChild.firstElementChild.appendChild(emaillabel)
                 }
@@ -569,7 +576,6 @@
             var nextEntry = wallet[0];
             if (nextEntry != undefined) {
                 if (index + 1 < wallet.length) { nextEntry = wallet[index + 1]; } else { index = 0; }
-                console.log(index)
                 index++;
                 element.innerHTML = `<label style="color:lime;user-select: none;cursor: pointer;">+ ${formatter.format(nextEntry.amount).split("A")[1]} (From: ${nextEntry.source})</label>`
             }

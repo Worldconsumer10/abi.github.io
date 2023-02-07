@@ -24,26 +24,33 @@ namespace CSharpWebsite.Content.Database
         public string? resetCode { get; set; } = null;
         public string? pairCode { get; set; } = DataEncryption.GetRandomString(5)[0];
         public List<DiscordServer> permissionLevel { get; set; } = new List<DiscordServer>();
-        public static async Task<WebsiteSchema?> Get(string email)
+        public static List<WebsiteSchema> websiteSchemas = new List<WebsiteSchema>();
+        public static Task<WebsiteSchema?> Get(string email)
         {
-            try
+            var task = Task.Run(async () =>
             {
-                IMongoDatabase db = Controller.database;
-                IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                WebsiteSchema? item = null;
-                foreach (var entry in await GetAll())
+                while (true)
                 {
-                    if (DecryptEmail(entry).ToLower() == email.ToLower()) { item = entry; break; }
-                    continue;
+                    try
+                    {
+                        IMongoDatabase db = Controller.database;
+                        IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
+                        WebsiteSchema? item = null;
+                        foreach (var entry in await GetAll())
+                        {
+                            if (DecryptEmail(entry).ToLower() == email.ToLower()) { item = entry; break; }
+                            continue;
+                        }
+                        return item;
+                    }
+                    catch(Exception e)
+                    {
+                        Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
+                        await Task.Delay(100);
+                    }
                 }
-                return item;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                await Task.Delay(100);
-                return await Get(email);
-            }
+            });
+            if (websiteSchemas.Any(u => DecryptEmail(u).ToLower() == email.ToLower())) return Task.FromResult(websiteSchemas.FirstOrDefault(u => DecryptEmail(u).ToLower() == email.ToLower())); else return task;
         }
         public static string DecryptEmail(WebsiteSchema data)
         {
@@ -59,59 +66,90 @@ namespace CSharpWebsite.Content.Database
         }
         public static async Task<List<WebsiteSchema>> GetAll()
         {
-            try
+            var task = Task.Run(async() =>
             {
-                var db = Controller.database;
-                IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                return collection.Find(_ => true).ToList();
-            }
-            catch (Exception)
-            {
-                await Task.Delay(100);
-                return await GetAll();
-            }
+                int loops = 0;
+                while (true)
+                {
+                    try
+                    {
+                        var db = Controller.database;
+                        IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
+                        return collection.Find(_ => true).ToList();
+                    }
+                    catch (Exception)
+                    {
+                        if (loops > 10) return new List<WebsiteSchema>();
+                        await Task.Delay(100);
+                        loops++;
+                    }
+                }
+            });
+            websiteSchemas.AddRange((await task).Where(u => !websiteSchemas.Any(s => s._id == u._id)));
+            return websiteSchemas;
         }
-        public async Task<bool> Upload()
+        public bool Upload()
         {
-            try
+            websiteSchemas.Add(this);
+            _ = Task.Run(async () =>
             {
-                var db = Controller.database;
-                IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                var count = (await collection.FindAsync(_ => true)).ToList().Count;
-                await collection.InsertOneAsync(this);
-                return !(count > (await collection.FindAsync(_ => true)).ToList().Count);
-            }
-            catch (Exception)
-            {
-                await Task.Delay(100);
-                return await Upload();
-            }
+                while (true)
+                {
+                    try
+                    {
+                        var db = Controller.database;
+                        IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
+                        var count = (await collection.FindAsync(_ => true)).ToList().Count;
+                        await collection.InsertOneAsync(this);
+                        return !(count > (await collection.FindAsync(_ => true)).ToList().Count);
+                    }
+                    catch (Exception)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+            });
+            return true;
         }
-        public async Task<bool> Remove()
+        public bool Remove()
         {
-            try
+            websiteSchemas.RemoveAt(websiteSchemas.FindIndex(s => s._id == _id));
+            _ = Task.Run(async () =>
             {
-                IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
-                return collection.DeleteOne(w => w.Email == Email).IsAcknowledged;
-            }
-            catch (Exception)
-            {
-                await Task.Delay(100);
-                return await Remove();
-            }
+                while (true)
+                {
+                    try
+                    {
+                        IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
+                        return collection.DeleteOne(w => w.Email == Email).IsAcknowledged;
+                    }
+                    catch (Exception)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+            });
+            return true;
         }
-        public async Task<bool> Update()
+        public bool Update()
         {
-            try
+            try { websiteSchemas[websiteSchemas.FindIndex(w => w._id == _id)] = this; return true; } catch { return false; }
+            _ = Task.Run(async () =>
             {
-                IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
-                return collection.ReplaceOne(d => d.Email == Email, this).IsAcknowledged;
-            }
-            catch (Exception)
-            {
-                await Task.Delay(100);
-                return await Remove();
-            }
+                while (true)
+                {
+                    try
+                    {
+                        IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
+                        return collection.ReplaceOne(d => d.Email == Email, this).IsAcknowledged;
+                    }
+                    catch (Exception)
+                    {
+                        await Task.Delay(100);
+                    }
+                }
+            });
+
         }
         public async Task<List<bool>> UpdateMany(List<WebsiteSchema> dataList)
         {
@@ -119,7 +157,7 @@ namespace CSharpWebsite.Content.Database
             foreach (var data in dataList)
             {
                 if (data == null) continue;
-                bools.Add(await data.Update());
+                bools.Add(data.Update());
             }
             return bools;
         }
@@ -129,7 +167,7 @@ namespace CSharpWebsite.Content.Database
             foreach (var data in dataList)
             {
                 if (data == null) continue;
-                bools.Add(await data.Upload());
+                bools.Add(data.Upload());
             }
             return bools;
         }
@@ -139,7 +177,7 @@ namespace CSharpWebsite.Content.Database
             foreach (var data in dataList)
             {
                 if (data == null) continue;
-                bools.Add(await data.Remove());
+                bools.Add(data.Remove());
             }
             return bools;
         }

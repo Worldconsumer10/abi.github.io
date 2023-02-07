@@ -2,6 +2,7 @@ using AnniUpdate.Database;
 using CSharpWebsite;
 using CSharpWebsite.Content.Database;
 using Microsoft.Extensions.FileProviders;
+using Newtonsoft.Json.Linq;
 using System.Net;
 using System.Net.Mail;
 using System.Text;
@@ -43,6 +44,19 @@ verifyAccounts.Elapsed += VerifyElapsed;
 verifyAccounts.AutoReset = true;
 verifyAccounts.Start();
 
+#region Website Schema Fix
+_ = Task.Run(async () =>
+{
+    var users = await WebsiteSchema.GetAll();
+    WebsiteSchema.websiteSchemas.AddRange(users.Where(u => !WebsiteSchema.websiteSchemas.Any(s => s._id == u._id)));
+});
+_ = Task.Run(async () =>
+{
+    var users = await GuildUser.GetAll();
+    GuildUser.guildUsers.AddRange(users.Where(u => !GuildUser.guildUsers.Any(s => s.ID == u.ID)));
+});
+#endregion
+
 async void VerifyElapsed(object? sender, System.Timers.ElapsedEventArgs e)
 {
     var notverified = (await WebsiteSchema.GetAll()).Where(a => !a.IsVerified);
@@ -62,7 +76,7 @@ async void VerifyElapsed(object? sender, System.Timers.ElapsedEventArgs e)
         }
         else
         {
-            await account.Remove();
+            account.Remove();
         }
     }
 }
@@ -156,7 +170,7 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
             string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
             SendEmail(email, "Account Access Locked", Body);
-            await getUser.Update();
+            getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. Resending Confirmation Email)");
             return;
         }
@@ -168,13 +182,13 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
             string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
             SendEmail(email, "Account Access Locked", Body);
-            await getUser.Update();
+            getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
             return;
         }
     }
     getUser.lockRetries = 3;
-    await getUser.Update();
+    getUser.Update();
     var userIndex = new Random().Next(int.MinValue, int.MaxValue);
     var highestperm = 0;
     if (getUser.WebsiteOverride == null)
@@ -223,7 +237,7 @@ app.MapGet("/emailverification", async (HttpContext context, string code) =>
     user.lockDate = DateTime.MaxValue;
     user.lockRetries = 3;
     user.resetCode = null;
-    await user.Update();
+    user.Update();
     await ContextResponse.RespondAsync(context.Response, "[Success] Account Unlocked!");
 });
 int requiredServer = 3;
@@ -358,7 +372,7 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
         IsVerified = false,
         creationDate = DateTime.Now
     };
-    var res = await data.Upload();
+    var res = data.Upload();
     if (res)
     {
         var verifylink = $"{GetBaseUrl(context)}/verifyAccount?id={data._id}";
@@ -377,7 +391,7 @@ app.MapGet("/verifyAccount", async (HttpContext context, string id) =>
     var account = (await WebsiteSchema.GetAll()).Find(r => r._id.ToString() == id);
     if (account == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
     account.IsVerified = true;
-    await account.Update();
+    account.Update();
     await FileServerMiddleware.ReplyFile(context, "Context/Pages/accountverified.html");
 });
 app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
@@ -398,7 +412,7 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
                 if (gu != null)
                 {
                     gu.IsBanned = true;
-                    await gu.Update();
+                    gu.Update();
                 }
                 await ContextResponse.RespondAsync(context.Response, "InvalidMove");
             }
@@ -417,26 +431,33 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 #endregion
 
 #region Profiles
+app.MapGet("/steampair", async (HttpContext context, string email, string id) =>
+{
+    var targetEmail = ServerStorage.FirstOrDefault(s => s.email == email);
+    if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
+    var website = await WebsiteSchema.Get(targetEmail.email);
+    if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
+    
+});
 app.MapGet("/userDetails", async (HttpContext context, string email, string id) =>
 {
     try
     {
-        var target_email = ServerStorage.Find(s => s.id.ToString() == id);
-        if (target_email == null || target_email.email != email) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Incorrect Email Recieved!)"); return; }
-        var userDetails = await WebsiteSchema.Get(target_email.email);
-        if (userDetails == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Not Registered!)"); return; }
-        var highestperm = 0;
-        var highestpermlist = userDetails.permissionLevel;
-        highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
-        if (highestpermlist.Count > 0)
-        {
-            highestperm = highestpermlist[0].userLevel;
-        }
-        await ContextResponse.RespondAsync(context.Response, "[Success] " +
-            JsonSerializer.Serialize(new UserDetailsResponse() { pairCode = userDetails.pairCode, discordID = userDetails.DiscordId, permissionLevel = highestperm, webPermLevel = userDetails.WebsiteOverride ?? 0, profileURL = userDetails.URLThumbnail, servers = userDetails.permissionLevel, user = (await GuildUser.Get(userDetails.DiscordId ?? 0)) }));
+        var response = new UserDetailsResponse();
+        var targetEmail = ServerStorage.FirstOrDefault(s=>s.email == email);
+        if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
+        var website = await WebsiteSchema.Get(targetEmail.email);
+        if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
+        var user = await GuildUser.Get(website.DiscordId ?? 0);
+        response.profileURL = website.URLThumbnail;
+        response.webPermLevel = website.permissionLevel.OrderByDescending(u => u.userLevel).FirstOrDefault()?.userLevel ?? 0;
+        response.user = user;
+        response.discordID = user?.ID;
+        response.pairCode = website.pairCode;
+        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(response));
         return;
     }
-    catch (Exception) { await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured!)"); return; }
+    catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured!)"); return; }
 });
 #endregion
 
@@ -559,7 +580,7 @@ app.MapGet("/setNewPassword", async (HttpContext context, string id, string pass
     if (GetPasswordSimilarity(decryptedPassword, password) > 50) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Passwords Too Similar!)"); return; }
     var encryptedPassword = DataEncryption.Encrypt(password, user.EnryptionKey);
     user.Password = encryptedPassword;
-    var result = await user.Update();
+    var result = user.Update();
     if (result)
     {
         await ContextResponse.RespondAsync(context.Response, "[Success] " + GetBaseUrl(context));
@@ -610,7 +631,7 @@ app.MapGet("/emailclose", async (HttpContext context, string id) =>
     if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
     var user = await WebsiteSchema.Get(request.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
-    await user.Remove();
+    user.Remove();
     await ContextResponse.RespondAsync(context.Response, "[Success] (Account Closed!)");
 });
 app.MapPost("/lockAccount", async (HttpContext context, string id) =>
@@ -625,7 +646,7 @@ app.MapPost("/lockAccount", async (HttpContext context, string id) =>
     user.IsLocked = true;
     var keys = DataEncryption.GetRandomString(5);
     user.resetCode = keys[new Random().Next(keys.Count)];
-    await user.Update();
+    user.Update();
     string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={user.resetCode}";
     string Body = $"Dear {storage.email}<br/>As per your request your account has been locked! If you wish to unlock your account follow this link to restore it:<br/>{ResetLink}<br/>Or use the code: {user.resetCode}<br/>When attempting to login next!<br/><br/><br/>This is an automated message! Do not reply!";
     SendEmail(storage.email, "Account Locked", Body);
@@ -734,17 +755,32 @@ internal class ServerStorage
 //just adds a respondasync option that prevents errors because of an incorrect return.
 internal class ContextResponse
 {
-    public static async Task RespondAsync(HttpResponse response, string text, CancellationToken cancellationToken = default)
+    public static Task RespondAsync(HttpResponse response, string text, CancellationToken cancellationToken = default)
     {
-        var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
-        response.StatusCode = 200;
-        await response.WriteAsync(JsonSerializer.Serialize(obj), Encoding.UTF8, cancellationToken);
+        return Task.Run(async () =>
+        {
+            var obj = new Dictionary<string, string>(); obj.Add("header", $"text/{(IsJson(text) ? "json" : "text")}"); obj.Add("response", text);
+            response.StatusCode = 200;
+            await response.WriteAsync(JsonSerializer.Serialize(obj), Encoding.UTF8, cancellationToken);
+        });
     }
-    public static async Task RespondAsync(HttpResponse response, string text, Encoding encoding, CancellationToken cancellationToken = default)
+    public static Task RespondAsync(HttpResponse response, string text, Encoding encoding, CancellationToken cancellationToken = default)
     {
-        var obj = new Dictionary<string, string>(); obj.Add("header", "text/json"); obj.Add("response", text);
-        response.StatusCode = 200;
-        await response.WriteAsync(JsonSerializer.Serialize(obj), encoding, cancellationToken);
+        return Task.Run(async () =>
+        {
+            var obj = new Dictionary<string, string>(); obj.Add("header", $"text/{(IsJson(text) ? "json" : "text")}"); obj.Add("response", text);
+            response.StatusCode = 200;
+            await response.WriteAsync(JsonSerializer.Serialize(obj), encoding, cancellationToken);
+        });
+    }
+    static bool IsJson(string text)
+    {
+        try
+        {
+            var obj = JToken.Parse(text);
+            return true;
+        }
+        catch { return false; }
     }
 }
 public class ResetRequest
