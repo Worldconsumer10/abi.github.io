@@ -21,7 +21,7 @@ builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromSeconds(10);
-    options.Cookie.HttpOnly = true;
+    options.Cookie.HttpOnly = false;
     options.Cookie.IsEssential = true;
 });
 
@@ -30,7 +30,6 @@ var app = builder.Build();
 app.UseExceptionHandler("/error");
 app.UseHsts();
 
-app.UseHttpsRedirection();
 app.UseSession();
 app.UseStaticFiles(new StaticFileOptions
 {

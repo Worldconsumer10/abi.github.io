@@ -107,6 +107,8 @@ namespace AnniUpdate.Database
         public double Bounty { get; set; } = 0;
         public List<DetLog> detLogs { get; set; } = new List<DetLog>();
         public List<TempActionReference> tempReferences { get; set; } = new List<TempActionReference>();
+        public string fakeBSB { get; set; } = "oe-34-da-53-hf-vh";
+        public ulong fakeAccNum { get; set; } = (ulong)new Random().NextInt64(long.MinValue, long.MaxValue);
         public GuildUser Clone()
         {
             return (GuildUser)MemberwiseClone();
