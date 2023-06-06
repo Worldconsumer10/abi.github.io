@@ -493,6 +493,7 @@
                     try {
                         user = JSON.parse(userDetails.substring(userDetails.indexOf(' ') + 1))
                     } catch (e) { }
+                    console.log(user)
                     if (user.discordID == null) { //No paired with discord
                         var notpaired = document.createElement("label")
                         notpaired.innerText = "Not Paired"
@@ -505,7 +506,7 @@
                         element.lastElementChild.firstElementChild.appendChild(pairid)
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
                         var pairnotif = document.createElement("label")
-                        pairnotif.innerText = "Please pair by running <a!pair " + json.pairCode + "> in any discord Anni is in!"
+                        pairnotif.innerText = "Please pair by running <a!pair " + user.pairCode + "> in any discord Anni is in!"
                         pairnotif.classList.add("profileElement")
                         element.lastElementChild.firstElementChild.appendChild(pairnotif)
                     } else { //Paired with discord

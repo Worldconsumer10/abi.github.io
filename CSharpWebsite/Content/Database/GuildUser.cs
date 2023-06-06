@@ -91,12 +91,12 @@ namespace AnniUpdate.Database
             return new TempAction { duration = new DateTime(long.Parse(durationTicks)).TimeOfDay, start = new DateTime(long.Parse(startTicks)), type = type, EndDate = new DateTime(long.Parse(EndDateTicks)), Id = ulong.Parse(Id) };
         }
     }
+    [BsonIgnoreExtraElements]
     public class GuildUser
     {
         [BsonId]
         public ulong ID { get; set; }
         public string Name { get; set; } = "Test User";
-        public List<BadgeReference> badges { get; set; } = new List<BadgeReference>();
         public double Level { get; set; } = 1;
         public double XP { get; set; } = 0;
         public List<Earnings> Wallet { get; set; } = new List<Earnings>();
@@ -105,10 +105,20 @@ namespace AnniUpdate.Database
         public int fakeAccNum { get; set; } = new Random().Next(0, int.MaxValue);
         public bool rudeAnni { get; set; } = false;
         public double Bounty { get; set; } = 0;
-        public List<DetLog> detLogs { get; set; } = new List<DetLog>();
-        public List<TempActionReference> tempReferences { get; set; } = new List<TempActionReference>();
-        public string fakeBSB { get; set; } = "oe-34-da-53-hf-vh";
-        public ulong fakeAccNum { get; set; } = (ulong)new Random().NextInt64(long.MinValue, long.MaxValue);
+        public GuildUser(ulong iD, string name, double level, double xP, List<Earnings> wallet, double bank, string fakeBSB, int fakeAccNum, bool rudeAnni, double bounty)
+        {
+            ID = iD;
+            Name = name ?? throw new ArgumentNullException(nameof(name));
+            Level = level;
+            XP = xP;
+            Wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
+            Bank = bank;
+            this.fakeBSB = fakeBSB ?? throw new ArgumentNullException(nameof(fakeBSB));
+            this.fakeAccNum = fakeAccNum;
+            this.rudeAnni = rudeAnni;
+            Bounty = bounty;
+        }
+
         public GuildUser Clone()
         {
             return (GuildUser)MemberwiseClone();

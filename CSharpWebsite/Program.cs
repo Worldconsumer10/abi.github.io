@@ -1,6 +1,7 @@
 using AnniUpdate.Database;
 using CSharpWebsite;
 using CSharpWebsite.Content.Database;
+using CSharpWebsite.Functions;
 using Microsoft.Extensions.FileProviders;
 using Newtonsoft.Json.Linq;
 using System.Net;
@@ -149,7 +150,6 @@ app.MapGet("/banned", async (HttpContext context) =>
 #endregion
 
 #region AccountRelated
-List<ServerStorage> ServerStorage = new List<ServerStorage>();
 app.MapGet("/submitLogin", async (HttpContext context, string email, string password) =>
 {
     if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Input)"); return; }
@@ -167,8 +167,8 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
-            string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
-            SendEmail(email, "Account Access Locked", Body);
+            string Body = $"Dear {decryptedEmail}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
+            SendEmail(decryptedEmail, "Account Access Locked", Body);
             getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. Resending Confirmation Email)");
             return;
@@ -179,8 +179,8 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
             var keys = DataEncryption.GetRandomString(5);
             getUser.resetCode = keys[new Random().Next(keys.Count)];
             string ResetLink = $"{GetBaseUrl(context)}/emailverification?code={getUser.resetCode}";
-            string Body = $"Dear {email}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
-            SendEmail(email, "Account Access Locked", Body);
+            string Body = $"Dear {decryptedEmail}\nRecent activity on your account for website:<br/><br/>ubunifuserver.com<br/><br/>Has been marked as suspicious! Please follow this link:<br/>{ResetLink}<br/>Or use the code: {getUser.resetCode}<br/>When attempting to login next!<br/><br/><br/><i>If you did not try logging in recently it is suggested to keep an eye on your account as someone may be attempting to access it!</i><br/><br/>This is an automated message! Do not reply!";
+            SendEmail(decryptedEmail, "Account Access Locked", Body);
             getUser.Update();
             await ContextResponse.RespondAsync(context.Response, $"[Failure] (Incorrect Password. {getUser.lockRetries} Retries Left)");
             return;
@@ -188,46 +188,9 @@ app.MapGet("/submitLogin", async (HttpContext context, string email, string pass
     }
     getUser.lockRetries = 3;
     getUser.Update();
-    var userIndex = new Random().Next(int.MinValue, int.MaxValue);
-    var highestperm = 0;
-    if (getUser.WebsiteOverride == null)
-    {
-        var highestpermlist = getUser.permissionLevel;
-        highestpermlist.Sort((a, b) => { if (a.userLevel < b.userLevel) return 1; if (a.userLevel > b.userLevel) return -1; return 0; });
-        if (highestpermlist.Count > 0)
-        {
-            highestperm = highestpermlist[0].userLevel;
-        }
-    }
-    else
-    {
-        highestperm = (int)getUser.WebsiteOverride;
-    }
-    if (!ServerStorage.Any(s => s.email.ToLower() == decryptedEmail.ToLower()))
-    {
-        var nstorage = new ServerStorage()
-        {
-            email = decryptedEmail,
-            id = userIndex,
-            permissionLevel = highestperm
-        };
-        ServerStorage.Add(nstorage);
-        await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
-        return;
-    }
-    else
-    {
-        var storage = ServerStorage.Find(s => s.email.ToLower() == decryptedEmail.ToLower()) ?? new ServerStorage();
-        var nstorage = new ServerStorage()
-        {
-            id = userIndex,
-            email = decryptedEmail,
-            permissionLevel = highestperm
-        };
-        ServerStorage[ServerStorage.FindIndex(s => s.email.ToLower() == decryptedEmail.ToLower())] = nstorage;
-        await ContextResponse.RespondAsync(context.Response, "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = decryptedEmail, sessionId = nstorage.id, URLThumbnail = getUser.URLThumbnail, permissionLevel = highestperm }));
-        return;
-    }
+    string res = SessionUser.LoggedIn(getUser,decryptedEmail);
+    await ContextResponse.RespondAsync(context.Response, res);
+    return;
 });
 app.MapGet("/emailverification", async (HttpContext context, string code) =>
 {
@@ -244,7 +207,7 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
 {
     try
     {
-        var storage = ServerStorage.Find(t => t.id.ToString() == id && t.email == email);
+        var storage = SessionUser.GetSessionUser(t => t.sessionID.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
@@ -261,7 +224,7 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
 {
     try
     {
-        var storage = ServerStorage.Find(t => t.id.ToString() == id && t.email == email);
+        var storage = SessionUser.GetSessionUser(t => t.sessionID.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         var user = await WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
@@ -395,25 +358,23 @@ app.MapGet("/verifyAccount", async (HttpContext context, string id) =>
 });
 app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 {
-    var jsonResult = JsonSerializer.Deserialize<UserResponse>(json);
-    if (jsonResult != null)
+    try
     {
-        var element = ServerStorage.Find(s => s.id == jsonResult.sessionId);
-        if (element != null && jsonResult != null)
+        var jsonResult = JsonSerializer.Deserialize<UserResponse>(json);
+        if (jsonResult != null)
         {
-            if (element.email.ToLower() == jsonResult.email.ToLower())
+            var result = SessionUser.OnCheckin(jsonResult.sessionId, jsonResult.email);
+            switch (result)
             {
-                await ContextResponse.RespondAsync(context.Response, "Verified");
-            }
-            else
-            {
-                var gu = await WebsiteSchema.Get(element.email);
-                if (gu != null)
-                {
-                    gu.IsBanned = true;
-                    gu.Update();
-                }
-                await ContextResponse.RespondAsync(context.Response, "InvalidMove");
+                case null:
+                    await ContextResponse.RespondAsync(context.Response, "InvalidMove");
+                    break;
+                case true:
+                    await ContextResponse.RespondAsync(context.Response, "Verified");
+                    break;
+                default:
+                    await ContextResponse.RespondAsync(context.Response, "NotLoggedIn");
+                    break;
             }
         }
         else
@@ -421,10 +382,7 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
             await ContextResponse.RespondAsync(context.Response, "NotLoggedIn");
         }
     }
-    else
-    {
-        await ContextResponse.RespondAsync(context.Response, "NotLoggedIn");
-    }
+    catch { await ContextResponse.RespondAsync(context.Response, "InvalidMove"); }
     return;
 });
 #endregion
@@ -432,7 +390,7 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 #region Profiles
 app.MapGet("/steampair", async (HttpContext context, string email, string id) =>
 {
-    var targetEmail = ServerStorage.FirstOrDefault(s => s.email == email);
+    var targetEmail = SessionUser.GetSessionUser(s => s.email == email);
     if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
     var website = await WebsiteSchema.Get(targetEmail.email);
     if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
@@ -443,7 +401,7 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
     try
     {
         var response = new UserDetailsResponse();
-        var targetEmail = ServerStorage.FirstOrDefault(s=>s.email == email);
+        var targetEmail = SessionUser.GetSessionUser(s=>s.email == email);
         if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
         var website = await WebsiteSchema.Get(targetEmail.email);
         if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
@@ -597,8 +555,8 @@ app.MapPost("/editUser", async (HttpContext context, string id) =>
 {
     try
     {
-        var storage = ServerStorage.Find(s => s.id.ToString() == id);
-        if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
+        var storage = SessionUser.GetSessionUser(s => s.sessionID.ToString() == id);
+        if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/useredit.html");
     }
     catch (Exception e)
@@ -608,9 +566,9 @@ app.MapPost("/editUser", async (HttpContext context, string id) =>
 });
 app.MapPost("/closeAccount", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.id.ToString() == id);
+    var storage = SessionUser.GetSessionUser(s => s.sessionID.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.id.ToString() == id);
+    SessionUser.RemoveAll(s => s.sessionID.ToString() == id);
     var request = new ResetRequest()
     {
         _id = new Random().NextInt64(long.MinValue, long.MaxValue),
@@ -635,9 +593,9 @@ app.MapGet("/emailclose", async (HttpContext context, string id) =>
 });
 app.MapPost("/lockAccount", async (HttpContext context, string id) =>
 {
-    var storage = ServerStorage.Find(s => s.id.ToString() == id);
+    var storage = SessionUser.GetSessionUser(s => s.sessionID.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.id.ToString() == id);
+    SessionUser.RemoveAll(s => s.sessionID.ToString() == id);
     var user = await WebsiteSchema.Get(storage.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
     user.lockDate = DateTime.Now;
@@ -654,9 +612,9 @@ app.MapPost("/lockAccount", async (HttpContext context, string id) =>
 app.MapPost("/resetPasswordR", async (HttpContext context, string id) =>
 {
     resetRequests.RemoveAll(r => r.requestDate.AddMinutes(30) < DateTime.Now);
-    var storage = ServerStorage.Find(s => s.id.ToString() == id);
+    var storage = SessionUser.GetSessionUser(s => s.sessionID.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
-    ServerStorage.RemoveAll(s => s.id.ToString() == id);
+    SessionUser.RemoveAll(s => s.sessionID.ToString() == id);
     if (resetRequests.Any(r => r.email == storage.email))
     {
         resetRequests.RemoveAll(r => r.email == storage.email);
@@ -744,13 +702,6 @@ void SendEmail(string email, string subject, string body)
     smtpClient.Send(message);
 }
 
-internal class ServerStorage
-{
-    public int id { get; set; } = new Random().Next(int.MinValue, int.MaxValue);
-    public string email { get; set; } = "fucking.failed@fuck.com";
-    public int permissionLevel { get; set; } = 0;
-}
-
 //just adds a respondasync option that prevents errors because of an incorrect return.
 internal class ContextResponse
 {
@@ -806,7 +757,7 @@ public class UserDetailsResponse
 public class UserResponse
 {
     public string email { get; set; }
-    public long sessionId { get; set; }
+    public int sessionId { get; set; }
     public string URLThumbnail { get; set; }
     public int permissionLevel { get; set; }
 }
