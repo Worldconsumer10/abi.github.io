@@ -174,6 +174,9 @@
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState === XMLHttpRequest.DONE) {
                         if (xhr.status === 200) {
+                            document.open();
+                            document.write(xhr.responseText);
+                            document.close();
                             resolve(xhr.responseText);
                         } else {
                             reject("Error: " + xhr.status);
@@ -253,9 +256,6 @@
             var sessionId = jsonraw.split(",")[1].split(":")[1]
             profilesettings.onclick = async () => {
                 var res = await SendHTTPPost(`/editUser?id=${sessionId}`, null)
-                document.open();
-                document.write(res);
-                document.close();
             }
             login.parentElement.style.right = "175px"
             editServers.parentElement.style.right = "242.5px";
@@ -484,7 +484,7 @@
             element.style.opacity = 0;
         }
         var userWallet = []
-        const formatter = new Intl.NumberFormat('en-US', {
+        var formatter = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'AUD',
             minimumFractionDigits: 0, // (this suffices for whole numbers, but will print 2500.10 as $2,500.1)

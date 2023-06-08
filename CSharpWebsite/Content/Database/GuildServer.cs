@@ -15,6 +15,7 @@ namespace AnniUpdate.Database
         public List<ulong> BannedIDs { get; set; } = new List<ulong>();
         public List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>> TempBans { get; set; } = new List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>>();
         public double Inflation { get; set; } = 0;
+        public List<StockReference> stocks { get; set; } = new List<StockReference>();
         public List<ChatResponses> chatResponses { get; set; } = new List<ChatResponses>();
         public static async Task<List<GuildServer>> GetAll()
         {
@@ -40,6 +41,28 @@ namespace AnniUpdate.Database
             }
             catch (Exception ex)
             {
+                Console.WriteLine($"{ex.Message}\n{ex.InnerException}\n\n{ex.StackTrace}");
+                await Task.Delay(100);
+                return await Get(Id);
+            }
+        }
+        public static async Task<GuildServer?> Get(string Id)
+        {
+            try
+            {
+                var db = Controller.database;
+                var collection = db.GetCollection<GuildServer>("DiscordServers");
+                var col = await GetAll();
+                foreach (var item in col)
+                {
+                    if (item.GuildId.ToString() == Id)
+                        return item;
+                }
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{ex.Message}\n{ex.InnerException}\n\n{ex.StackTrace}");
                 await Task.Delay(100);
                 return await Get(Id);
             }
@@ -108,6 +131,45 @@ namespace AnniUpdate.Database
                 await Task.Delay(100);
                 return await UpdateOne();
             }
+        }
+    }
+    public class Stock
+    {
+        public string Name { get; set; } = "Example Stock";
+        /// <summary>
+        /// Rate is 1 for every $1000 invested
+        /// </summary>
+        public double rate { get; set; } = double.MinValue;
+        public ulong founder { get; set; } = ulong.MinValue;
+        public List<Tuple<ulong, double>> investors { get; set; } = new List<Tuple<ulong, double>>();
+        public StockReference Reference()
+        {
+            var refr = new StockReference { Name = Name, rate = rate, founder = founder.ToString() };
+            List<Tuple<string, double>> invRef = new List<Tuple<string, double>>();
+            foreach (var a in investors)
+            {
+                invRef.Add(Tuple.Create(a.Item1.ToString(), a.Item2));
+            }
+            refr.investors = invRef;
+            return refr;
+        }
+    }
+    public class StockReference
+    {
+        public string Name { get; set; } = new Stock().Name;
+        public double rate { get; set; } = double.MinValue;
+        public string founder { get; set; } = ulong.MinValue.ToString();
+        public List<Tuple<string, double>> investors { get; set; } = new List<Tuple<string, double>>();
+        public Stock Parse()
+        {
+            var refr = new Stock { Name = Name, rate = rate, founder = ulong.Parse(founder) };
+            List<Tuple<ulong, double>> invRef = new List<Tuple<ulong, double>>();
+            foreach (var a in investors)
+            {
+                invRef.Add(Tuple.Create(ulong.Parse(a.Item1), a.Item2));
+            }
+            refr.investors = invRef;
+            return refr;
         }
     }
     public class CommandReference

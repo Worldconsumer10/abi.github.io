@@ -3,11 +3,13 @@ using CSharpWebsite;
 using CSharpWebsite.Content.Database;
 using CSharpWebsite.Functions;
 using Microsoft.Extensions.FileProviders;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Net;
 using System.Net.Mail;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 HttpClient client = new HttpClient();
 
@@ -234,28 +236,37 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
         foreach (var server in serverlists)
         {
             if (server == null) continue;
-            lsits.Add(new ServerOverviewList()
+            if (server.userLevel < 3) continue;
+            var guild = GuildServer.Get(server.Id).GetAwaiter().GetResult();
+            string name = "Unknown Guild";
+            if (guild != null)
+                name = guild.GuildName;
+            var serverList = new ServerOverviewList()
             {
                 server = server,
-                Name = (await GuildServer.Get(server.Id))?.GuildName ?? "Unknown Guild"
-            });
+                Name = name,
+                serverID = (guild?.GuildId ?? server.Id).ToString()
+            };
+            lsits.Add(serverList);
         }
-        await ContextResponse.RespondAsync(context.Response, JsonSerializer.Serialize(lsits));
+        var js = JsonConvert.SerializeObject(lsits);
+        await ContextResponse.RespondAsync(context.Response, js);
+        return;
     }
     catch (Exception e)
     {
         Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
-        await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return;
+        await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html");
+        return;
     }
 });
 app.MapGet("/getServerDetails", async (HttpContext context, string id) =>
 {
     try
     {
-        ulong idd = ULongParse(id);
-        var server = await GuildServer.Get(idd);
+        var server = await GuildServer.Get(id);
         if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Server Does Not Exist!)"); return; }
-        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(server));
+        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(server));
     }
     catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured)"); return; }
 });
@@ -297,8 +308,7 @@ app.MapPost("/loadServerConfig", async (HttpContext context, string id) =>
 {
     try
     {
-        ulong idd = ULongParse(id);
-        var server = await GuildServer.Get(idd);
+        var server = await GuildServer.Get(id);
         if (server == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfig.html");
 
@@ -359,7 +369,7 @@ app.MapGet("/verifyLogin", async (HttpContext context, string json) =>
 {
     try
     {
-        var jsonResult = JsonSerializer.Deserialize<UserResponse>(json);
+        var jsonResult = JsonConvert.DeserializeObject<UserResponse>(json);
         if (jsonResult != null)
         {
             var result = SessionUser.OnCheckin(jsonResult.sessionId, jsonResult.email);
@@ -410,7 +420,7 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
         response.user = user;
         response.discordID = website?.DiscordId;
         response.pairCode = website?.pairCode;
-        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(response));
+        await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(response));
         return;
     }
     catch (Exception e) { Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}"); await ContextResponse.RespondAsync(context.Response, "[Failure] (An Error Occured!)"); return; }
@@ -420,45 +430,99 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
 #region ServerConfig
 app.MapGet("/addResponse", async (HttpContext context, string id, string prompts, string response) =>
 {
-    var promptarray = new List<string>();
-    var responsearray = new List<string>();
-    foreach (var prompt in prompts.Trim('"').Split(",").ToList())
-    {
-        if (prompt != null) { promptarray.Add(prompt.Trim(' ')); }
-    }
-    foreach (var resppppp in response.Trim('"').Split(",").ToList())
-    {
-        var respp = resppppp;
-        if (respp.All(c => char.IsWhiteSpace(c))) { respp = "Unknown Response"; }
-        if (respp != null) { responsearray.Add(respp.Trim(' ')); }
-    }
+    var promptarray = SplitString(prompts);
+    var responsearray = SplitString(response);
     var server = await GuildServer.Get(ulong.Parse(id));
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
     if (server.chatResponses.Any(r => r.phrases.Any(p => promptarray.Any(a => a.ToLower().Contains(p.ToLower()))))) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Duplicate Prompts)"); return; }
     var chatresponse = new ChatResponses()
     {
         enabled = true,
-        phrases = promptarray,
-        responses = responsearray
+        phrases = promptarray.Select(a =>
+        {
+            a = string.Join(string.Empty, a.Split('"'));
+            a.Trim();
+            return a;
+        }).Where(r => !r.All(c => char.IsWhiteSpace(c))).ToList(),
+        responses = responsearray.Select(a =>
+        {
+            a = string.Join(string.Empty, a.Split('"'));
+            a.Trim();
+            return a;
+        }).Where(r => !r.All(c => char.IsWhiteSpace(c))).ToList()
     };
     server.chatResponses.Add(chatresponse);
     await server.UpdateOne();
     await ContextResponse.RespondAsync(context.Response, "[Success] (Updated Server!)"); return;
+
+    string[] SplitString(string input)
+    {
+        return input.Split(",");
+    }
+});
+app.MapGet("/modifyResponse", async (HttpContext context, string id, string prompts, string response,string newprompts, string newresponse) =>
+{
+    var promptarray = SplitString(prompts).Where(r => !r.All(c => char.IsWhiteSpace(c)));
+    var responsearray = SplitString(response).Where(r => !r.All(c => char.IsWhiteSpace(c)));
+    var newpromptarray = SplitString(newprompts).Where(r=>!r.All(c=>char.IsWhiteSpace(c)));
+    var newresponsearray = SplitString(newresponse).Where(r => !r.All(c => char.IsWhiteSpace(c)));
+    var server = await GuildServer.Get(ulong.Parse(id));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    var rep = server.chatResponses.FirstOrDefault(r=>IsMatching(r));
+    if (rep==null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Missing Prompt)"); return; }
+    var ind = server.chatResponses.FindIndex(r => IsMatching(r));
+    foreach (var item in newpromptarray)
+    {
+        if (item.All(c => char.IsWhiteSpace(c))) continue;
+        if (item.Contains("|"))
+            rep.phrases.Add(item.Replace('|', ',').Trim().Trim('"'));
+        else
+            rep.phrases.Add(item.Trim().Trim('"'));
+    }
+    foreach (var item in newresponsearray)
+    {
+        if (item.All(c => char.IsWhiteSpace(c))) continue;
+        if (item.Contains("|"))
+            rep.responses.Add(item.Replace('|', ',').Trim().Trim('"'));
+        else
+            rep.responses.Add(item.Trim().Trim('"'));
+    }
+    server.chatResponses[ind] = rep;
+    await server.UpdateOne();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Updated Server!)"); 
+    return;
+    bool IsMatching(ChatResponses response)
+    {
+        if (response == null) return false;
+        if (!response.phrases.All(r => r!=null && (promptarray?.Any(p => RemoveChar('"',p).ToLower().Contains(r.ToLower())) ?? false)))
+            return false;
+        if (!response.responses.All(r => r != null && (responsearray?.Any(p => RemoveChar('"', p).ToLower().Contains(r.ToLower())) ?? false)))
+            return false;
+        return true;
+    }
+    string RemoveChar(char chara,string str)
+    {
+        return string.Join(string.Empty, str.Where(c => c != chara));
+    }
+    string[] SplitString(string input)
+    {
+        return input.Split(",");
+    }
 });
 app.MapGet("/getServerResponses", async (HttpContext context, string id) =>
 {
-    var server = await GuildServer.Get(ulong.Parse(id));
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
-    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(server.chatResponses)); return;
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(server.chatResponses)); return;
 });
 app.MapGet("/updateResponse", async (HttpContext context, string id, string prompt, string state) =>
 {
     var promptarray = new List<string>();
     foreach (var pro in prompt.Trim('"').Split(",").ToList())
     {
-        if (pro != null) { promptarray.Add(pro.Trim(' ')); }
+        if (pro != null) { promptarray.Add(pro.Trim().Trim('[').Trim(']')); }
     }
-    var server = await GuildServer.Get(ulong.Parse(id));
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
     var b_state = bool.Parse(state);
     var resp = server.chatResponses.Find(c => c.phrases.Any(p => promptarray.Any(a => a.ToLower() == p.ToLower())));
@@ -474,9 +538,9 @@ app.MapGet("/removeResponse", async (HttpContext context, string id, string prom
     var promptarray = new List<string>();
     foreach (var pro in prompt.Trim('"').Split(",").ToList())
     {
-        if (pro != null) { promptarray.Add(pro.Trim(' ')); }
+        if (pro != null) { promptarray.Add(pro.Trim().Trim('[').Trim(']')); }
     }
-    var server = await GuildServer.Get(ulong.Parse(id));
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
     var resp = server.chatResponses.Find(c => c.phrases.Any(p => promptarray.Any(a => a.ToLower() == p.ToLower())));
     if (resp == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (No Valid Responses!)"); return; }
@@ -522,7 +586,7 @@ app.MapGet("/getRRequest", async (HttpContext context, string id) =>
     var request = resetRequests.Find(r => r._id.ToString() == id);
     if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
     if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
-    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(request));
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(request));
 });
 app.MapGet("/setNewPassword", async (HttpContext context, string id, string password) =>
 {
@@ -728,7 +792,7 @@ internal class ContextResponse
         {
             var obj = new Dictionary<string, string>(); obj.Add("header", $"text/{(IsJson(text) ? "json" : "text")}"); obj.Add("response", text);
             response.StatusCode = 200;
-            await response.WriteAsync(JsonSerializer.Serialize(obj), Encoding.UTF8, cancellationToken);
+            await response.WriteAsync(JsonConvert.SerializeObject(obj), Encoding.UTF8, cancellationToken);
         });
     }
     public static Task RespondAsync(HttpResponse response, string text, Encoding encoding, CancellationToken cancellationToken = default)
@@ -737,7 +801,7 @@ internal class ContextResponse
         {
             var obj = new Dictionary<string, string>(); obj.Add("header", $"text/{(IsJson(text) ? "json" : "text")}"); obj.Add("response", text);
             response.StatusCode = 200;
-            await response.WriteAsync(JsonSerializer.Serialize(obj), encoding, cancellationToken);
+            await response.WriteAsync(JsonConvert.SerializeObject(obj), encoding, cancellationToken);
         });
     }
     static bool IsJson(string text)
@@ -760,6 +824,7 @@ public class ServerOverviewList
 {
     public DiscordServer server { get; set; } = new DiscordServer();
     public string Name { get; set; } = "Test Server";
+    public string serverID { get; set; } = "1231241";
 }
 public class UserDetailsResponse
 {

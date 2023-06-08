@@ -139,7 +139,7 @@
             fm.remove()
         }
         onload = async function () {
-            var id = this.document.URL.split("id=")[1];
+            var id = sessionStorage.getItem("serverTarget")
             var response = await SendHTTPGet(`/getServerDetails?id=${id}`)
             if (response == undefined) return;
             var jsonstr = response.substring(response.indexOf(' ') + 1);
@@ -208,8 +208,8 @@
                 for (var i = 0; i < json.length; i++) {
                     var response = json[i];
                     if (response == null || response == undefined) continue;
-                    var prompts = response.phrases.join(", ")
-                    var responseret = response.responses.join(", ")
+                    var prompts = "["+response.phrases.join("], [")+"]"
+                    var responseret = "[" +response.responses.join("], [")+"]"
                     var enabled = response.enabled == true ? true : false
                     await addTemplatedResponse(prompts, responseret, enabled)
                 }
@@ -251,8 +251,9 @@
             } else {
                 clone.children[0].src = "Images/siteassets/switchoff.png"
             }
+            console.log(clone)
             clone.children[4].innerHTML = `Prompt: <label style="color:lime">${prompt}<label/>`
-            clone.children[6].innerHTML = `Response: <label style="color:lime">${response}<label/>`
+            clone.children[8].innerHTML = `Response: <label style="color:lime">${response}<label/>`
             clone.id = `customtemplateresponse`
             clone.removeAttribute("hidden")
             var infield = storage.children[storage.children.length - 1]
@@ -284,10 +285,10 @@
             return undefined
         }
         async function addResponse(element) {
-            var serverid = this.document.URL.split("id=")[1];
+            var serverid = sessionStorage.getItem("serverTarget")
             var prompts = element.children[1].value
             var responseval = element.children[4].value
-            var response = await SendHTTPGet(`/addResponse?id=${serverid}&prompts="${prompts}"&response="${response}"`)
+            var response = await SendHTTPGet(`/addResponse?id=${serverid}&prompts="${prompts}"&response="${responseval}"`)
             console.log("Response: " + response);
             if (response.includes("[Success]")) {
                 addTemplatedResponse(prompts, responseval, true)
@@ -310,8 +311,36 @@
                 },3000)
             }
         }
+        async function modifyResponse(element) {
+            var serverid = sessionStorage.getItem("serverTarget")
+            var prompts = element.children[4].innerText.split("Prompt: ").join("")
+            var newPrompt = element.children[5].value
+            var responseval = element.children[8].innerText.split("Response: ").join("")
+            var newresponse = element.children[9].value
+            var response = await SendHTTPGet(`/modifyResponse?id=${serverid}&prompts="${prompts}"&response="${responseval}"&newprompts="${newPrompt}"&newresponse="${newresponse}"`)
+            if (response.includes("[Success]")) {
+                SendHTTPPost(`/loadServerConfig?id=${serverid}`, null);
+            } else if (parseFloat(element.style.height.split("px")) < 125) {
+                var breakline = document.createElement("br")
+                var label = document.createElement("label")
+                label.style.opacity = 1;
+                label.classList.toggle("show", true)
+                label.style.color = "red";
+                label.innerText = response.split("[Failure] ")[1].split(")")[0].split("(")[1]
+                var pheight = parseFloat(element.style.height.split("px"))
+                element.style.height = `${pheight + 20}px`
+                element.appendChild(breakline)
+                element.appendChild(label)
+                setTimeout(() => {
+                    var pheight = parseFloat(element.style.height.split("px"))
+                    element.style.height = `${pheight - 20}px`
+                    label.remove()
+                    breakline.remove()
+                }, 3000)
+            }
+        }
         async function toggleResponse(element) {
-            var serverid = this.document.URL.split("id=")[1];
+            var serverid = sessionStorage.getItem("serverTarget")
             var prompt = element.parentNode.children[4].innerText.substring(element.parentNode.children[4].innerText.indexOf(' ') + 1)
             var baseurl = document.baseURI.split("/").splice(0, 3).join("/")
             var targetState = element.src == baseurl + "/Images/siteassets/switchoff.png"
@@ -326,7 +355,7 @@
             }
         }
         async function removeResponse(element) {
-            var serverid = this.document.URL.split("id=")[1];
+            var serverid = sessionStorage.getItem("serverTarget")
             var prompt = element.parentNode.children[4].innerText.substring(element.parentNode.children[4].innerText.indexOf(' ') + 1)
             var res = await SendHTTPGet(`/removeResponse?id=${serverid}&prompt="${prompt}"`).catch(e => { })
             if (res.includes("[Success]")) {
@@ -418,20 +447,20 @@
                 <label>Name: TestModule</label>
             </fieldset>
         </fieldset>
-        <fieldset id="responseStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:290px;min-height:290px;left:370px; top:100px">
-            <fieldset id="responseDisplayTemplate" hidden="" style="fill-opacity:99;opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;height:50px;min-width:500px;top:15px;width:max-content;">
+        <fieldset id="responseStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:300px;min-height:290px;left:370px; top:100px">
+            <fieldset id="responseDisplayTemplate" hidden="" style="fill-opacity:99;opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;height:55px;min-width:500px;top:15px;width:max-content;">
                 <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="toggleResponse(this)">
                 <label>&nbsp</label>
                 <input type="button" value="Delete Response" style="background:none;border-color:red;" onclick="removeResponse(this)" />
                 <br />
-                <label>Prompt: Test, Response</label>
+                <label>Prompt: Test, Response</label><input style="min-width:10px;width:auto;" title='This is a list of prompts that the bot in this server should listen for. Use (|) to instead of commas unless splitting text' type="text" /><input type="button" value="Add Prompt" onclick="modifyResponse(this.parentElement)" style="border-radius:5px" />
                 <br />
-                <label>Response: Fuck this shit im out!</label>
+                <label>Response: Fuck this shit im out!</label><input style="min-width:10px;width:auto;" title='This is the response to any of the prompts. Use (|) to instead of commas unless splitting text' type="text" /><input type="button" value="Add Response" onclick="modifyResponse(this.parentElement)" style="border-radius:5px" />
             </fieldset>
             <fieldset id="responseAdd" style="fill-opacity: 99; opacity: 1; border: solid; border-color: black; background-color: gray; position: absolute; z-index: 101; border-radius: 7px; height: 60px; top:15px; min-width: 500px; width: max-content;">
-                <label>Prompts: </label><input title="This is a list of prompts that the bot in this server should listen for. Prompts are seperated by (,)" type="text" />
+                <label>Prompts: </label><input title='This is a list of prompts that the bot in this server should listen for. Use (|) to instead of commas unless splitting text' type="text" />
                 <br />
-                <label>Response: </label><input title="This is the response to any of the prompts. Responses are seperated by (,)" type="text" />
+                <label>Response: </label><input title='This is the response to any of the prompts. Use (|) to instead of commas unless splitting text' type="text" />
                 <br />
                 <input type="button" value="Add Response" onclick="addResponse(this.parentElement)" style="border-radius:5px" />
             </fieldset>

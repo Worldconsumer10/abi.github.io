@@ -57,7 +57,6 @@
                 justify-content: center;
                 align-items: center;
             }
-
             .inputTab {
                 border: double;
                 border-color: red;
@@ -106,84 +105,82 @@
         </div>
         <fieldset class="TopBarElement" style="border:solid;border-color:lime;border-radius:7px;top:10px;font:bold;font-size:15px;user-select:none;cursor:pointer" onclick="ReturnToList(this)">Back To Homepage</fieldset>
         <script>
-            async function ReturnToList(element) {
-                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-                await SendHTTPPost(`/`);
-            }
             function SendHTTPGet(connection) {
                 return new Promise((resolve, reject) => {
-                    fetch(connection).then(function (response) {
+                    var res = fetch(connection).then(function (response) {
                         return response.json();
                     }).then(function (data) {
                         resolve(data.response);
                     }).catch(function (err) {
-                        reject(`Error: ${err}`)
+                        reject(`Fetch Error: ${err}`)
                     });
                 })
             }
             function SendHTTPPost(connection, content) {
-                var fm = document.createElement("form")
-                fm.setAttribute("method", "post")
-                fm.setAttribute("action", connection)
-                if (content != undefined) {
-                    var d = document.createElement("input")
-                    d.setAttribute("type", "text")
-                    d.setAttribute("id", "data")
-                    var cont = content
-                    if (typeof content == "object") { cont = JSON.stringify(content) }
-                    d.setAttribute("value", cont)
-                    fm.appendChild(d);
-                    document.body.appendChild(fm)
-                    fm.submit();
-                    d.remove();
-                } else { document.body.appendChild(fm); fm.submit(); }
-                fm.remove()
+                return new Promise((resolve, reject) => {
+                    // Create a new XMLHttpRequest object
+                    var xhr = new XMLHttpRequest();
+
+                    // Define the request method, URL, and async flag
+                    xhr.open("POST", connection, true);
+
+                    // Set the request header (optional)
+                    xhr.setRequestHeader("Content-Type", "application/json");
+
+                    // Define the callback function when the request is complete
+                    xhr.onreadystatechange = function () {
+                        if (xhr.readyState === XMLHttpRequest.DONE) {
+                            if (xhr.status === 200) {
+                                document.open();
+                                document.write(xhr.responseText);
+                                document.close();
+                                resolve(xhr.responseText);
+                            } else {
+                                reject("Error: " + xhr.status);
+                            }
+                        }
+                    };
+
+                    xhr.send(content);
+                });
             }
-            onload = async function () {
-                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
-                var response = await SendHTTPGet(`/requestServers?email=${json.email ?? "none"}&id=${json.sessionId ?? 0}`);
-                console.log(response)
-                var json = JSON.parse(response);
-                if (json == null) return;
-                var entry = 0;
-                var line = 0;
-                var baseline = 30 / ((clamp(json.length, 0, 4) / 4) * 6)
-                console.log(`Base: 30, Servers: ${json.length}, Divider: ${(clamp(json.length, 0, 4) / 4)}, Final Divider: ${(clamp(json.length, 0, 4) / 4) * 6}, Resulted Baseline: ${baseline}`)
-                for (var i = 0; i < json.length; i++) {
-                    var server = json[i];
-                    if (server == undefined) continue;
-                    var clone = document.getElementById("servertemplate").cloneNode(true)
-                    var url = server.server.serverimgURL
-                    if (url == null) { url = "Images/unknownprofliepic.png" }
-                    clone.children[0].setAttribute("src", url)
-                    clone.removeAttribute("hidden")
-                    clone.setAttribute("id", server.server.Id)
-                    clone.children[2].innerText = server.Name
-                    entry++;
-                    if (entry > 4) {
-                        line++;
-                        entry = 1;
+            function ReturnToList(element) {
+                SendHTTPPost("/", null).then(() => { }).catch(() => { })
+            }
+            window.onload = async () => {
+                try {
+                    var sess = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                    var data = await SendHTTPGet(`/requestServers?email=${sess.email}&id=${sess.sessionId}`)
+                    var json = JSON.parse(data)
+                    var element = document.getElementById("servertemplate")
+                    var s = 15
+                    console.log(json)
+                    for (var i = 0; i < json.length; i++) {
+                        var clone = element.cloneNode(true)
+                        clone.children[0].src = json[i].server.serverimgURL
+                        clone.children[2].innerText = json[i].Name
+                        clone.children[2].id = json[i].serverID
+                        clone.style.left = s + "vw"
+                        s=s+15
+                        clone.removeAttribute("hidden")
+                        document.getElementById("serverHolder").appendChild(clone)
                     }
-                    clone.style.left = `${clamp(baseline + (15 * entry), 0, 500)}vw`
-                    clone.style.top = `${150 + (200 * line)}px`
-                    document.getElementById("serverDivider").appendChild(clone)
-                }
+                } catch { }
             }
-            function loadServerConfig(element) {
-                var id = element.children[0].src.split("/")[4]
-                SendHTTPPost(`/loadServerConfig?id=${id}`)
-            }
-            function clamp(n, m, x) {
-                if (n < m) { return m } else if (n > x) { return x } else { return n }
+            async function loadServerConfig(element) {
+                SendHTTPPost(`/loadServerConfig?id=${element.children[2].id}`, null)
+                    .then(() => {
+                        sessionStorage.setItem("serverTarget", element.children[2].id)
+                    })
             }
         </script>
-        <div id="serverDivider" class="alignContentCenter">
-
-        </div>
         <fieldset id="servertemplate" hidden="" style="text-align:center;cursor:pointer;left:35vw;top:150px;border:solid;border-color:black;user-select:none;background-color:gray;width:auto;min-width:100px;min-height:100px;border-radius:6px;position:absolute;z-index:100" onclick="loadServerConfig(this)">
             <img src="Images/unknownprofilepic.png" style="margin-left:15px" />
             <br />
             <label>Unknown Server</label>
         </fieldset>
+        <div id="serverHolder">
+
+        </div>
     </body>
 </html>
