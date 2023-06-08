@@ -471,6 +471,12 @@
             element = document.getElementById("ProfileTab")
             element.className = "show";
             element.style.opacity = 1;
+            try {
+                var extra = element.childNodes[3].childNodes[1]
+                while (extra.childNodes[4]) {
+                    extra.removeChild(extra.childNodes[4])
+                }
+            } catch { }
             var nodes = element.lastElementChild.firstElementChild.childNodes;
             var possibleNodes = []
             for (var i = 0; i < nodes.length; i++) {
