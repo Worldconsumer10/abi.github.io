@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
+﻿using CSharpWebsite.Functions;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 
 namespace CSharpWebsite.Content.Database
@@ -25,32 +26,28 @@ namespace CSharpWebsite.Content.Database
         public string? pairCode { get; set; } = DataEncryption.GetRandomString(5)[0];
         public List<DiscordServer> permissionLevel { get; set; } = new List<DiscordServer>();
         public static List<WebsiteSchema> websiteSchemas = new List<WebsiteSchema>();
-        public static Task<WebsiteSchema?> Get(string email)
+        public static WebsiteSchema? Get(string email)
         {
-            var task = Task.Run(async () =>
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
+                    IMongoDatabase db = Controller.database;
+                    IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
+                    var allc = GetAll().GetAwaiter().GetResult();
+                    foreach (var entry in allc)
                     {
-                        IMongoDatabase db = Controller.database;
-                        IMongoCollection<WebsiteSchema> collection = db.GetCollection<WebsiteSchema>("websitedatas");
-                        WebsiteSchema? item = null;
-                        foreach (var entry in await GetAll())
-                        {
-                            if (DecryptEmail(entry).ToLower() == email.ToLower()) { item = entry; break; }
-                            continue;
-                        }
-                        return item;
+                        if (DecryptEmail(entry).ToLower() == email.ToLower())
+                            return entry;
                     }
-                    catch(Exception e)
-                    {
-                        Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
-                        await Task.Delay(100);
-                    }
+                    return null;
                 }
-            });
-            if (websiteSchemas.Any(u => DecryptEmail(u).ToLower() == email.ToLower())) return Task.FromResult(websiteSchemas.FirstOrDefault(u => DecryptEmail(u).ToLower() == email.ToLower())); else return task;
+                catch (Exception e)
+                {
+                    Console.WriteLine($"{e.Message}\n{e.InnerException}\n\n{e.StackTrace}");
+                    Task.Delay(100).GetAwaiter().GetResult();
+                }
+            }
         }
         public static string DecryptEmail(WebsiteSchema data)
         {
@@ -64,11 +61,10 @@ namespace CSharpWebsite.Content.Database
                 return "An Error Occured";
             }
         }
-        public static async Task<List<WebsiteSchema>> GetAll()
+        public static Task<List<WebsiteSchema>> GetAll()
         {
-            var task = Task.Run(async() =>
+            return Task.Run(async () =>
             {
-                int loops = 0;
                 while (true)
                 {
                     try
@@ -79,14 +75,10 @@ namespace CSharpWebsite.Content.Database
                     }
                     catch (Exception)
                     {
-                        if (loops > 10) return new List<WebsiteSchema>();
                         await Task.Delay(100);
-                        loops++;
                     }
                 }
             });
-            websiteSchemas.AddRange((await task).Where(u => !websiteSchemas.Any(s => s._id == u._id)));
-            return websiteSchemas;
         }
         public bool Upload()
         {
@@ -133,22 +125,21 @@ namespace CSharpWebsite.Content.Database
         }
         public bool Update()
         {
-            try { websiteSchemas[websiteSchemas.FindIndex(w => w._id == _id)] = this; return true; } catch { return false; }
-            _ = Task.Run(async () =>
+            bool localChanged = false;
+            try { websiteSchemas[websiteSchemas.FindIndex(w => w._id == _id)] = this; localChanged = true; } catch { localChanged = false; }
+            while (true)
             {
-                while (true)
+                try
                 {
-                    try
-                    {
-                        IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
-                        return collection.ReplaceOne(d => d.Email == Email, this).IsAcknowledged;
-                    }
-                    catch (Exception)
-                    {
-                        await Task.Delay(100);
-                    }
+                    IMongoCollection<WebsiteSchema> collection = Controller.database.GetCollection<WebsiteSchema>("websitedatas");
+                    return collection.ReplaceOne(d => d.Email == Email, this).IsAcknowledged && localChanged;
                 }
-            });
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"{ex.Message}\n{ex.InnerException}\n\n{ex.StackTrace}");
+                    Task.Delay(100).GetAwaiter().GetResult();
+                }
+            }
 
         }
         public async Task<List<bool>> UpdateMany(List<WebsiteSchema> dataList)

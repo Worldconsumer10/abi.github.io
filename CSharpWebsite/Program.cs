@@ -153,7 +153,7 @@ app.MapGet("/banned", async (HttpContext context) =>
 app.MapGet("/submitLogin", async (HttpContext context, string email, string password) =>
 {
     if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Input)"); return; }
-    var getUser = await WebsiteSchema.Get(email);
+    var getUser = WebsiteSchema.Get(email);
     if (getUser == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
     if (getUser.IsLocked) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Locked!)"); return; }
     if (getUser.IsBanned) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Account Banned!)"); return; }
@@ -209,7 +209,7 @@ app.MapPost("/sendConfigure", async (HttpContext context, string email, string i
     {
         var storage = SessionUser.GetSessionUser(t => t.sessionID.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        var user = await WebsiteSchema.Get(storage.email);
+        var user = WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         if (!user.permissionLevel.Any(l => l.userLevel >= requiredServer)) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         await FileServerMiddleware.ReplyFile(context, "Content/Pages/serverconfiglist.html");
@@ -226,7 +226,7 @@ app.MapGet("/requestServers", async (HttpContext context, string email, string i
     {
         var storage = SessionUser.GetSessionUser(t => t.sessionID.ToString() == id && t.email == email);
         if (storage == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
-        var user = await WebsiteSchema.Get(storage.email);
+        var user = WebsiteSchema.Get(storage.email);
         if (user == null) { await FileServerMiddleware.ReplyFile(context, "Content/Pages/errorpages/403.html"); return; }
         List<ServerOverviewList> lsits = new List<ServerOverviewList>();
         var serverlists = user.permissionLevel.Where(u => u.userLevel >= requiredServer);
@@ -309,7 +309,7 @@ app.MapPost("/loadServerConfig", async (HttpContext context, string id) =>
 app.MapGet("/createAccount", async (HttpContext context, string email, string password) =>
 {
     if (email == "None" || password == "None") { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Input)"); return; }
-    var getUser = await WebsiteSchema.Get(email);
+    var getUser = WebsiteSchema.Get(email);
     if (getUser != null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Already Registered)"); return; }
     var keys = DataEncryption.RandomKeyString(new Random().Next(5, 6));
     var encryptedEmail = DataEncryption.Encrypt(email, keys);
@@ -330,7 +330,6 @@ app.MapGet("/createAccount", async (HttpContext context, string email, string pa
         pairCode = DataEncryption.GetRandomString(5)[0],
         resetCode = null,
         URLThumbnail = string.Empty,
-        permissionLevel = new List<DiscordServer>(),
         IsVerified = false,
         creationDate = DateTime.Now
     };
@@ -392,7 +391,7 @@ app.MapGet("/steampair", async (HttpContext context, string email, string id) =>
 {
     var targetEmail = SessionUser.GetSessionUser(s => s.email == email);
     if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
-    var website = await WebsiteSchema.Get(targetEmail.email);
+    var website = WebsiteSchema.Get(targetEmail.email);
     if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
     
 });
@@ -401,16 +400,16 @@ app.MapGet("/userDetails", async (HttpContext context, string email, string id) 
     try
     {
         var response = new UserDetailsResponse();
-        var targetEmail = SessionUser.GetSessionUser(s=>s.email == email);
+        var targetEmail = SessionUser.GetSessionUser(s=>s.email == email || s.sessionID.ToString()==id);
         if (targetEmail == null) { Console.WriteLine("Target Email Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Email Invalid"); return; }
-        var website = await WebsiteSchema.Get(targetEmail.email);
+        var website = targetEmail.website;
         if (website == null) { Console.WriteLine("Website Null"); context.Response.StatusCode = 500; await ContextResponse.RespondAsync(context.Response, "[Failure] Website Null"); return; }
-        var user = await GuildUser.Get(website.DiscordId ?? 0);
+        var user = targetEmail.user;
         response.profileURL = website.URLThumbnail;
-        response.webPermLevel = website.permissionLevel.OrderByDescending(u => u.userLevel).FirstOrDefault()?.userLevel ?? 0;
+        response.webPermLevel = website.permissionLevel.OrderBy(p => p.userLevel).ElementAtOrDefault(0)?.userLevel ?? 0;
         response.user = user;
-        response.discordID = user?.ID;
-        response.pairCode = website.pairCode;
+        response.discordID = website?.DiscordId;
+        response.pairCode = website?.pairCode;
         await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonSerializer.Serialize(response));
         return;
     }
@@ -493,7 +492,7 @@ app.MapGet("/submitResetRequest", async (HttpContext context, string email) =>
 {
     var femail = string.Join(string.Empty, email.Split('"'));
     resetRequests.RemoveAll(r => r.requestDate.AddMinutes(30) < DateTime.Now);
-    var resetUser = await WebsiteSchema.Get(femail);
+    var resetUser = WebsiteSchema.Get(femail);
     if (resetUser == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Email Not Registered)"); return; }
     if (resetRequests.Any(r => r.email == femail))
     {
@@ -530,7 +529,7 @@ app.MapGet("/setNewPassword", async (HttpContext context, string id, string pass
     var request = resetRequests.Find(r => r._id.ToString() == id);
     if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
     if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
-    var user = await WebsiteSchema.Get(request.email);
+    var user = WebsiteSchema.Get(request.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
     var decryptedPassword = DataEncryption.Decrypt(user.Password, user.EnryptionKey);
     if (decryptedPassword.ToLower() == password.ToLower()) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Same Password)"); return; }
@@ -561,8 +560,9 @@ app.MapPost("/editUser", async (HttpContext context, string id) =>
     }
     catch (Exception e)
     {
-        await ContextResponse.RespondAsync(context.Response, $"[Failure] ({e.Message}\n{e.Source}\n\n{e.StackTrace})"); return;
+        await ContextResponse.RespondAsync(context.Response, $"[Failure] ({e.Message}\n{e.Source}\n\n{e.StackTrace})");
     }
+    return;
 });
 app.MapPost("/closeAccount", async (HttpContext context, string id) =>
 {
@@ -580,23 +580,38 @@ app.MapPost("/closeAccount", async (HttpContext context, string id) =>
     string Body = $"Dear {storage.email}<br/>I have recieved a request for your account to be terminated!<br/>Fear not! Closing your account can be done by just following this link:<br/>{ResetLink}<br/><i>If you did not do this action, please reset your password immediately!<i/><br/><br/>This is an automated message! Do not reply!";
     SendEmail(storage.email, "Account Close Request", Body);
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+    return;
 });
 app.MapGet("/emailclose", async (HttpContext context, string id) =>
 {
     var request = resetRequests.Find(r => r._id.ToString() == id);
     if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Invalid)"); return; }
     if (request.requestDate.AddMinutes(30) < DateTime.Now) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Request Expired)"); return; }
-    var user = await WebsiteSchema.Get(request.email);
+    var user = WebsiteSchema.Get(request.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
     user.Remove();
     await ContextResponse.RespondAsync(context.Response, "[Success] (Account Closed!)");
+    return;
+});
+app.MapGet("/unpairAccount", async (HttpContext context, string id) =>
+{
+    var request = SessionUser.GetSessionUser(u => u.sessionID.ToString() == id);
+    if (request == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In)"); return; }
+    var user = WebsiteSchema.Get(request.email);
+    if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered)"); return; }
+    user.DiscordId = null;
+    user.pairCode = DataEncryption.GetRandomString(5)[0];
+    user.IsPaired = false;
+    user.Update();
+    await ContextResponse.RespondAsync(context.Response, "[Success] (Completed)");
+    return;
 });
 app.MapPost("/lockAccount", async (HttpContext context, string id) =>
 {
     var storage = SessionUser.GetSessionUser(s => s.sessionID.ToString() == id);
     if (storage == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Logged In!)"); return; }
     SessionUser.RemoveAll(s => s.sessionID.ToString() == id);
-    var user = await WebsiteSchema.Get(storage.email);
+    var user = WebsiteSchema.Get(storage.email);
     if (user == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not Registered!)"); return; }
     user.lockDate = DateTime.Now;
     user.lockRetries = 0;
@@ -608,6 +623,7 @@ app.MapPost("/lockAccount", async (HttpContext context, string id) =>
     string Body = $"Dear {storage.email}<br/>As per your request your account has been locked! If you wish to unlock your account follow this link to restore it:<br/>{ResetLink}<br/>Or use the code: {user.resetCode}<br/>When attempting to login next!<br/><br/><br/>This is an automated message! Do not reply!";
     SendEmail(storage.email, "Account Locked", Body);
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+    return;
 });
 app.MapPost("/resetPasswordR", async (HttpContext context, string id) =>
 {
@@ -629,6 +645,7 @@ app.MapPost("/resetPasswordR", async (HttpContext context, string id) =>
     var resetUrl = $"{GetBaseUrl(context)}/resetPassword?id={resetRequest._id}";
     SendEmail(storage.email, "Account Password Reset", $"Hi {storage.email},<br/>I have recieved your request for a password reset!<br/>Lets get that underway shall we?<br/>I just need you to follow this link to reset your password<br/><br/>{resetUrl}<br/><br/><i>If you did not do this action, please disregard this email! The request will time out after 30 minutes<i/><br/>This is an automated message! Do not reply!");
     await FileServerMiddleware.ReplyFile(context, "Content/Pages/index.html");
+    return;
 });
 #endregion
 

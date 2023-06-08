@@ -9,16 +9,27 @@ namespace CSharpWebsite.Functions
     public class SessionUser
     {
         public string email { get; set; }
-        public GuildUser? user { get; set; }
-        public WebsiteSchema website { get; set; }
+        public GuildUser? user
+        {
+            get
+            {
+                if (website==null || website.DiscordId==null) return null;
+                return GuildUser.Get((ulong)website.DiscordId).GetAwaiter().GetResult();
+            }
+        }
+        public WebsiteSchema? website
+        {
+            get
+            {
+                return WebsiteSchema.Get(email);
+            }
+        }
         public int sessionID { get; set; }
         public DateTime lastChecked { get; set; }
         public Task sessionTask { get; set; }
-        public SessionUser(string email,WebsiteSchema schema, int sessionID, GuildUser? user=null)
+        public SessionUser(string email, int sessionID)
         {
             this.email = email;
-            this.user = user;
-            this.website = schema;
             this.sessionID = sessionID;
             lastChecked = DateTime.Now;
             this.sessionTask = Task.Run(async () =>
@@ -57,18 +68,17 @@ namespace CSharpWebsite.Functions
             }
             if (!IsLoggedIn(email))
             {
-                var nstorage = new SessionUser(email, user, sessionIndex, user.DiscordId != null ? GuildUser.Get((ulong)user.DiscordId).GetAwaiter().GetResult() : null);
+                var nstorage = new SessionUser(email, sessionIndex);
                 sessionUsers.Add(nstorage);
                 return "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = email, sessionId = nstorage.sessionID, URLThumbnail = user.URLThumbnail, permissionLevel = highestperm });
             }
             else
             {
                 var storage = sessionUsers.Find(s => s.email.ToLower() == email.ToLower());
-                var nstorage = new SessionUser(email, user, sessionIndex, null);
+                var nstorage = new SessionUser(email, sessionIndex);
                 if (storage != null)
                 {
                     nstorage.sessionID = storage.sessionID;
-                    nstorage.user = storage.user;
                 }
                 sessionUsers[sessionUsers.FindIndex(s => s.email.ToLower() == email.ToLower())] = nstorage;
                 return "[Success] (Logged In) " + JsonSerializer.Serialize(new UserResponse() { email = email, sessionId = nstorage.sessionID, URLThumbnail = user.URLThumbnail, permissionLevel = highestperm });

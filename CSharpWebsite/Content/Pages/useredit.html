@@ -122,19 +122,21 @@
         <input style="font-size: 10px; background-color: red; border-color: black; border-radius: 10px;color:white" type="button" value="Lock Account" onclick="LockAccount(this.parentElement)" />
         <br />
         <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" type="button" value="Request Password Reset" onclick="ResetPassword(this.parentElement)" />
+        <br />
+        <input style="font-size: 10px; background-color: lime; border-color: black;border-radius:10px" hidden="" id="unpairDiscord" type="button" value="Unpair Discord" onclick="UnpairAccount(this.parentElement)" />
     </fieldset>
     <script lang="en" language="javascript">
         async function ReturnToList(element) {
             await SendHTTPPost(`/`);
         }
-        window.onload = async function () {
+        window.onload = WindowOnload;
+        async function WindowOnload () {
             var userfield = document.getElementById("userfield")
             var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
             var response = await SendHTTPGet(`/userDetails?id=${json.sessionId}&email=${json.email}`).catch(e => { console.error(e) })
             var resjson = JSON.parse(response.substring(response.indexOf(' ') + 1))
-            console.log(response)
-            for (var i = 0; i < userfield.children.length; i++) {
-                var child = userfield.children[i];
+            for (var i = 0; i < userfield.childNodes.length; i++) {
+                var child = userfield.childNodes[i];
                 if (child == null) continue;
                 if (child.id == "") continue;
                 var permissionLevel = "Basic";
@@ -201,6 +203,9 @@
                         case "websiteperm":
                             if (webperm == "None") break;
                             child.innerHTML = `Website Overrride Permission Level: <label style="color:${webcolor}">${webperm}<label/>`
+                            child.removeAttribute("hidden")
+                            break;
+                        case "unpairDiscord":
                             child.removeAttribute("hidden")
                             break;
                         case "websitepermbreak":
@@ -272,6 +277,14 @@
                     reject(`Fetch Error: ${err}`)
                 });
             })
+        }
+        async function UnpairAccount(element) {
+            var result = confirm("Do you wish to unpair your account?")
+            if (result) {
+                var json = JSON.parse(sessionStorage.getItem("SessionDetails"))
+                await SendHTTPGet(`/unpairAccount?id=${json.sessionId}`).catch((e) => { })
+                await SendHTTPPost(`/editUser?id=${json.sessionId}`, null).catch((e) => { })
+            }
         }
         function SendHTTPPost(connection, content) {
             var fm = document.createElement("form")

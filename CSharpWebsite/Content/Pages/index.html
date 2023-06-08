@@ -148,6 +148,42 @@
     </div>
     <!--#endregion-->
     <script language="javascript">
+        function SendHTTPGet(connection) {
+            return new Promise((resolve, reject) => {
+                var res = fetch(connection).then(function (response) {
+                    return response.json();
+                }).then(function (data) {
+                    resolve(data.response);
+                }).catch(function (err) {
+                    reject(`Fetch Error: ${err}`)
+                });
+            })
+        }
+        function SendHTTPPost(connection, content) {
+            return new Promise((resolve, reject) => {
+                // Create a new XMLHttpRequest object
+                var xhr = new XMLHttpRequest();
+
+                // Define the request method, URL, and async flag
+                xhr.open("POST", connection, true);
+
+                // Set the request header (optional)
+                xhr.setRequestHeader("Content-Type", "application/json");
+
+                // Define the callback function when the request is complete
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        if (xhr.status === 200) {
+                            resolve(xhr.responseText);
+                        } else {
+                            reject("Error: " + xhr.status);
+                        }
+                    }
+                };
+
+                xhr.send(content);
+            });
+        }
         async function SendReset(element) {
             var logintab = document.getElementById("LoginTab").children[1].children[0]
             var emailinput = GetElementByName(element.parentElement, "Email")
@@ -203,8 +239,7 @@
                 }, 10000)
             } catch (e) { console.log(e) }
         }
-        function RestoreProfile()
-        {
+        function RestoreProfile() {
             var profilesettings = document.getElementById("editProfile").parentElement
             var login = document.getElementById("loginButton")
             var loginTab = document.getElementById("LoginTab")
@@ -216,7 +251,12 @@
             profilesettings.style.opacity = 1;
             profilesettings.classList.toggle("show", true)
             var sessionId = jsonraw.split(",")[1].split(":")[1]
-            profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${sessionId}`).then((r) => { }).catch((e) => { }) }
+            profilesettings.onclick = async () => {
+                var res = await SendHTTPPost(`/editUser?id=${sessionId}`, null)
+                document.open();
+                document.write(res);
+                document.close();
+            }
             login.parentElement.style.right = "175px"
             editServers.parentElement.style.right = "242.5px";
             //rest of shit
@@ -285,28 +325,6 @@
         function BrightenArrow(element) {
             if (element.style != null) {
                 element.style.filter = "brightness(100%)"
-            }
-        }
-        function SendHTTPGet(connection) {
-            return new Promise((resolve, reject) => {
-                var res = fetch(connection).then(function (response) {
-                    return response.json();
-                }).then(function (data) {
-                    resolve(data.response);
-                }).catch(function (err) {
-                    reject(`Fetch Error: ${err}`)
-                });
-            })
-        }
-        function SendHTTPPost(connection, header, content) {
-            var xhr = new XMLHttpRequest()
-            xhr.open('POST', connection, true)
-            xhr.setRequestHeader('Content-type', 'application/json')
-            xhr.send(content)
-            xhr.onload = function () {
-                if (xhr.status === 201) {
-                    console.log("Post successfully created!")
-                }
             }
         }
         function OldSendHTTPPost(connection,header, content) {
@@ -396,7 +414,12 @@
                     var profilesettings = document.getElementById("editProfile").parentElement
                     profilesettings.style.opacity = 1;
                     profilesettings.classList.toggle("show", true)
-                    profilesettings.firstElementChild.onclick = function () { SendHTTPPost(`/editUser?id=${jsonResult.sessionId}`).then((r) => { }).catch((e) => { }) }
+                    profilesettings.onclick = async () => {
+                        var res = await SendHTTPPost(`/editUser?id=${jsonResult.sessionId}`, null)
+                        document.open();
+                        document.write(res);
+                        document.close();
+                    }
                     document.getElementById("loginButton").parentElement.style.right = "175px"
                     document.getElementById("editServers").parentElement.style.right = "242.5px";
                     if (jsonResult.permissionLevel >= 3) {
@@ -499,7 +522,6 @@
                     try {
                         user = JSON.parse(userDetails.substring(userDetails.indexOf(' ') + 1))
                     } catch (e) { }
-                    console.log(user)
                     if (user.discordID == null) { //No paired with discord
                         var notpaired = document.createElement("label")
                         notpaired.innerText = "Not Paired"
@@ -507,7 +529,7 @@
                         element.lastElementChild.firstElementChild.appendChild(notpaired)
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
                         var pairid = document.createElement("label")
-                        pairid.innerText = "Pair Code: " + json.pairCode
+                        pairid.innerText = "Pair Code: " + user.pairCode
                         pairid.classList.add("profileElement")
                         element.lastElementChild.firstElementChild.appendChild(pairid)
                         element.lastElementChild.firstElementChild.appendChild(CreateLineBreak())
