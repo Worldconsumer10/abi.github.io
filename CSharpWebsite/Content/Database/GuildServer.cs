@@ -4,6 +4,37 @@ using MongoDB.Driver;
 
 namespace AnniUpdate.Database
 {
+    //
+    // Summary:
+    //     Specifies the severity of the log message.
+    public enum LogSeverity
+    {
+        //
+        // Summary:
+        //     Logs that contain the most severe level of error. This type of error indicate
+        //     that immediate attention may be required.
+        Critical,
+        //
+        // Summary:
+        //     Logs that highlight when the flow of execution is stopped due to a failure.
+        Error,
+        //
+        // Summary:
+        //     Logs that highlight an abnormal activity in the flow of execution.
+        Warning,
+        //
+        // Summary:
+        //     Logs that track the general flow of the application.
+        Info,
+        //
+        // Summary:
+        //     Logs that are used for interactive investigation during development.
+        Verbose,
+        //
+        // Summary:
+        //     Logs that contain the most detailed messages.
+        Debug
+    }
     public class GuildServer
     {
         [BsonId]
@@ -15,6 +46,9 @@ namespace AnniUpdate.Database
         public List<ulong> BannedIDs { get; set; } = new List<ulong>();
         public List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>> TempBans { get; set; } = new List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>>();
         public double Inflation { get; set; } = 0;
+        public ulong? logChannel { get; set; } = null;
+        public List<Tuple<string, ulong>> channels { get; set; } = new List<Tuple<string, ulong>>();
+        public LogSeverity logLevel { get; set; } = LogSeverity.Info;
         public List<StockReference> stocks { get; set; } = new List<StockReference>();
         public List<ChatResponses> chatResponses { get; set; } = new List<ChatResponses>();
         public static async Task<List<GuildServer>> GetAll()

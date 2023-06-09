@@ -509,6 +509,42 @@ app.MapGet("/modifyResponse", async (HttpContext context, string id, string prom
         return input.Split(",");
     }
 });
+app.MapGet("/getServerChannels", async (HttpContext context, string id) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(server.channels)); return;
+});
+app.MapGet("/setLogChannel", async (HttpContext context, string id,string channelid) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    if (!server.channels.Any(c=>c.Item2.ToString() != channelid)) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Channel ID)"); return; }
+    if (!ulong.TryParse(channelid, out ulong res)) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Not a Ulong)"); return; }
+    server.logChannel = res;
+    await server.UpdateOne();
+});
+app.MapGet("/setLogLevel", async (HttpContext context, string id,string level) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    LogSeverity? targ = null;
+    if (level.ToLower().Contains(LogSeverity.Critical.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Critical;
+    else if (level.ToLower().Contains(LogSeverity.Error.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Error;
+    else if (level.ToLower().Contains(LogSeverity.Debug.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Debug;
+    else if (level.ToLower().Contains(LogSeverity.Info.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Info;
+    else if (level.ToLower().Contains(LogSeverity.Debug.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Debug;
+    else if (level.ToLower().Contains(LogSeverity.Warning.ToString(), StringComparison.CurrentCultureIgnoreCase))
+        targ = LogSeverity.Warning;
+    if (targ==null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid LogSeverity)"); return; }
+    server.logLevel = (LogSeverity)targ;
+    await server.UpdateOne();
+});
 app.MapGet("/getServerResponses", async (HttpContext context, string id) =>
 {
     var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));

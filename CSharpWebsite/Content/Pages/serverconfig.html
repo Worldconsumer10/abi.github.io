@@ -145,7 +145,6 @@
             var jsonstr = response.substring(response.indexOf(' ') + 1);
             try {
                 var json = JSON.parse(jsonstr)
-                console.log(json)
                 for (var i = 0; i < json.eventModules.length; i++) {
                     var module = json.eventModules[i]
                     if (module == undefined) continue;
@@ -199,6 +198,7 @@
             } catch (e) { }
             //new stuff
             LoadAllResponses(id)
+            getChannels()
         }
         async function LoadAllResponses(id) {
             var response = await SendHTTPGet(`/getServerResponses?id=${id}`).catch((e) => { })
@@ -225,9 +225,7 @@
             } else {
                 element.children[0].src = "Images/siteassets/switchoff.png"
             }
-            console.log(`Setting Module: ${updateModuleName}'s State to: ${targetState}`)
             var response = await SendHTTPGet(`/updateModule?id=${serverid}&modulename=${updateModuleName}&state=${targetState}`)
-            console.log("Response: "+response)
         }
         async function updateCommand(element) {
             var serverid = this.document.URL.split("id=")[1];
@@ -239,9 +237,7 @@
             } else {
                 element.children[0].src = "Images/siteassets/switchoff.png"
             }
-            console.log(`Setting Command: ${updateModuleName}'s State to: ${targetState}`)
             var response = await SendHTTPGet(`/updateCommand?id=${serverid}&commandname=${updateModuleName}&state=${targetState}`)
-            console.log("Response: "+response);
         }
         async function addTemplatedResponse(prompt, response, enabled) {
             var storage = document.getElementById("responseStorage")
@@ -251,7 +247,6 @@
             } else {
                 clone.children[0].src = "Images/siteassets/switchoff.png"
             }
-            console.log(clone)
             clone.children[4].innerHTML = `Prompt: <label style="color:lime">${prompt}<label/>`
             clone.children[8].innerHTML = `Response: <label style="color:lime">${response}<label/>`
             clone.id = `customtemplateresponse`
@@ -289,7 +284,6 @@
             var prompts = element.children[1].value
             var responseval = element.children[4].value
             var response = await SendHTTPGet(`/addResponse?id=${serverid}&prompts="${prompts}"&response="${responseval}"`)
-            console.log("Response: " + response);
             if (response.includes("[Success]")) {
                 addTemplatedResponse(prompts, responseval, true)
             } else if (parseFloat(element.style.height.split("px")) < 125) {
@@ -345,7 +339,6 @@
             var baseurl = document.baseURI.split("/").splice(0, 3).join("/")
             var targetState = element.src == baseurl + "/Images/siteassets/switchoff.png"
             var res = await SendHTTPGet(`/updateResponse?id=${serverid}&prompt="${prompt}"&state=${targetState}`).catch(e => { })
-            console.log(res)
             if (res.includes("[Success]")) {
                 if (targetState) {
                     element.src = "Images/siteassets/switchon.png"
@@ -374,6 +367,8 @@
             var eventList = document.getElementById("moduleStorage")
             var commandList = document.getElementById("commandStorage")
             var response = document.getElementById("responseStorage")
+            var botlog = document.getElementById("botlogStorage")
+            botlog.setAttribute("hidden", "")
             eventList.removeAttribute("hidden")
             commandList.setAttribute("hidden", "")
             response.setAttribute("hidden", "")
@@ -389,11 +384,17 @@
             document.getElementById("responseTab").style.cursor = "pointer"
             document.getElementById("responseTab").children[0].style.cursor = "pointer"
             document.getElementById("responseTab").children[0].onclick = function () { responseSwitch(document.getElementById("responseTab")) }
+            document.getElementById("botlogTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("botlogTab").style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].onclick = function () { commandSwitch(document.getElementById("botlogTab")) }
         }
         function commandSwitch(element) {
             var eventList = document.getElementById("moduleStorage")
             var commandList = document.getElementById("commandStorage")
             var response = document.getElementById("responseStorage")
+            var botlog = document.getElementById("botlogStorage")
+            botlog.setAttribute("hidden", "")
             commandList.removeAttribute("hidden")
             eventList.setAttribute("hidden", "")
             response.setAttribute("hidden", "")
@@ -409,11 +410,17 @@
             document.getElementById("responseTab").style.cursor = "pointer"
             document.getElementById("responseTab").children[0].style.cursor = "pointer"
             document.getElementById("responseTab").children[0].onclick = function () { responseSwitch(document.getElementById("responseTab")) }
+            document.getElementById("botlogTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("botlogTab").style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].onclick = function () { commandSwitch(document.getElementById("botlogTab")) }
         }
         function responseSwitch(element) {
             var eventList = document.getElementById("moduleStorage")
             var commandList = document.getElementById("commandStorage")
             var response = document.getElementById("responseStorage")
+            var botlog = document.getElementById("botlogStorage")
+            botlog.setAttribute("hidden", "")
             commandList.setAttribute("hidden", "")
             eventList.setAttribute("hidden", "")
             response.removeAttribute("hidden")
@@ -429,12 +436,99 @@
             document.getElementById("responseTab").style.cursor = "default"
             document.getElementById("responseTab").children[0].style.cursor = "default"
             document.getElementById("responseTab").children[0].onclick = function () { }
+            document.getElementById("botlogTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("botlogTab").style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].style.cursor = "pointer"
+            document.getElementById("botlogTab").children[0].onclick = function () { commandSwitch(document.getElementById("botlogTab")) }
+        }
+        function botlogSwitch(element) {
+            var eventList = document.getElementById("moduleStorage")
+            var commandList = document.getElementById("commandStorage")
+            var response = document.getElementById("responseStorage")
+            var botlog = document.getElementById("botlogStorage")
+            botlog.removeAttribute("hidden")
+            commandList.setAttribute("hidden", "")
+            eventList.setAttribute("hidden", "")
+            response.setAttribute("hidden","")
+            document.getElementById("eventTab").onclick = function () { eventSwitch(document.getElementById("eventTab")) }
+            document.getElementById("eventTab").style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].style.cursor = "pointer"
+            document.getElementById("eventTab").children[0].onclick = function () { eventSwitch(document.getElementById("eventTab")) }
+            document.getElementById("commandTab").onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("commandTab").style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].style.cursor = "pointer"
+            document.getElementById("commandTab").children[0].onclick = function () { commandSwitch(document.getElementById("commandTab")) }
+            document.getElementById("responseTab").onclick = function () { }
+            document.getElementById("responseTab").style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].style.cursor = "pointer"
+            document.getElementById("responseTab").children[0].onclick = function () { }
+            document.getElementById("botlogTab").onclick = function () { }
+            document.getElementById("botlogTab").style.cursor = "default"
+            document.getElementById("botlogTab").children[0].style.cursor = "default"
+            document.getElementById("botlogTab").children[0].onclick = function () { }
+        }
+        async function getChannels()
+        {
+            var id = sessionStorage.getItem("serverTarget")
+            var response = await SendHTTPGet(`/getServerChannels?id=${id}`)
+            if (response.includes("[Success]")) {
+                try {
+                    var json = JSON.parse(response.split("[Success] ").join(""))
+                    var botlogContainer = document.getElementById("botlogChannel")
+                    var template = botlogContainer.children[0]
+                    for (var i = 0; i < json.length; i++) {
+                        var js = json[i];
+                        if (js == null) continue;
+                        var clone = template.cloneNode(true);
+                        clone.innerText = js.Item1
+                        clone.title = "ID: "+js.Item2
+                        clone.id = js.Item2
+                        botlogContainer.appendChild(clone)
+                    }
+                } catch (e) { console.error(e) }
+            }
+        }
+        async function UpdateLogChannel(element) {
+            console.log("Updating log channel")
+            var tar = element.children[0].id;
+            for (var i = 0; i < element.children.length; i++) {
+                if (element.children[i].innerText == element.value) {
+                    tar = element.children[i].id
+                    break;
+                }
+            }
+            console.log(tar)
+            var id = sessionStorage.getItem("serverTarget")
+            var response = await SendHTTPGet(`/setLogChannel?id=${id}&channelid=${tar}`)
+        }
+        async function UpdateLogLevel(element) {
+            console.log("Updating log level")
+            var tar = element.value
+            var id = sessionStorage.getItem("serverTarget")
+            var response = await SendHTTPGet(`/setLogLevel?id=${id}&level=${tar}`)
         }
     </script>
     <div>
         <fieldset id="eventTab" onclick="eventSwitch(this)" style="cursor: pointer; left: 150px; top: 100px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align: center; cursor: pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Event<br />Settings</label></fieldset>
         <fieldset id="commandTab" style="left: 150px; top: 225px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center;"><label class="profileElement" style="top:20px">Command<br />Settings</label></fieldset>
-        <fieldset id="responseTab" onclick="responseSwitch(this)"  style="left: 150px; top: 350px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center; cursor:pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Chat<br />Responses</label></fieldset>
+        <fieldset id="responseTab" onclick="responseSwitch(this)" style="left: 150px; top: 350px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center; cursor:pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Chat<br />Responses</label></fieldset>
+        <fieldset id="botlogTab" onclick="botlogSwitch(this)" style="left: 150px; top: 475px; opacity: 1; border: solid; border-color: black; position: absolute; z-index: 99; width: auto; height: auto; border-radius: 7px; min-width: 200px; min-height: 100px; background-color: gray; text-align:center; cursor:pointer"><label class="profileElement" style="top: 20px; cursor: pointer">Bot<br />Logs</label></fieldset>
+        <fieldset id="botlogStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:300px;min-height:300px;left:370px; top:100px">
+            <label class="profileElement">Channel: </label>
+            <select id="botlogChannel" onchange="UpdateLogChannel(this)" class="profileElement" style="color: white; background:none;border:none;">
+                <option style="color:black">Automatic</option>
+            </select>
+            <br />
+            <label class="profileElement">Log Level: </label>
+            <select class="profileElement" onchange="UpdateLogLevel(this)" style="color: white; background: none; border: none;">
+                <option style="color:black" title="Logs for when the program possibly crashed due to an error">Critical</option>
+                <option style="color:black" title="Logs for when the program failed to proccess something correctly">Error</option>
+                <option style="color:black" title="For potentially undesired items/content detected">Warning</option>
+                <option style="color:black" title="For tracking general items you may desire">Info</option>
+                <option style="color:black" title="Logs that are used for interactive investigation during development">Verbose</option>
+                <option style="color:black" title="Log literally everything that happens even if its not needed">Debug</option>
+            </select>
+        </fieldset>
         <fieldset id="moduleStorage" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:100;border-radius:7px;min-width:1000px;width:auto;height:300px;min-height:300px;left:370px; top:100px">
             <fieldset id="moduleTemplate" hidden="" style="opacity:1;border:solid;border-color:black;background-color:gray;position:absolute;z-index:101;border-radius:7px;min-height:50px;min-width:500px;top:15px;width:max-content;">
                 <img src="" style="width:auto;height:20px;cursor:pointer" type="checkbox" onclick="updateModule(this.parentNode)">
