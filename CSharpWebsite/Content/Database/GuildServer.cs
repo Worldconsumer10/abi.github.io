@@ -49,6 +49,7 @@ namespace AnniUpdate.Database
         public ulong? logChannel { get; set; } = null;
         public List<Tuple<string, ulong>> channels { get; set; } = new List<Tuple<string, ulong>>();
         public LogSeverity logLevel { get; set; } = LogSeverity.Info;
+        public string serverPrefix { get; set; } = "a!";
         public List<StockReference> stocks { get; set; } = new List<StockReference>();
         public List<ChatResponses> chatResponses { get; set; } = new List<ChatResponses>();
         public List<StoreItemReference> storeItems { get; set; } = new List<StoreItemReference>();
