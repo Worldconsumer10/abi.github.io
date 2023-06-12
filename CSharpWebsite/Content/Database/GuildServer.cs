@@ -54,8 +54,6 @@ namespace AnniUpdate.Database
         public string serverPrefix { get; set; } = "a!";
         public ulong? logChannel { get; set; } = null;
         public List<Tuple<string, ulong>> channels { get; set; } = new List<Tuple<string, ulong>>();
-        public LogSeverity logLevel { get; set; } = LogSeverity.Info;
-        public string serverPrefix { get; set; } = "a!";
         public List<StockReference> stocks { get; set; } = new List<StockReference>();
         public List<ChatResponses> chatResponses { get; set; } = new List<ChatResponses>();
         public List<StoreItemReference> storeItems { get; set; } = new List<StoreItemReference>();
@@ -174,12 +172,6 @@ namespace AnniUpdate.Database
                 return await UpdateOne();
             }
         }
-    }
-    public class StoreItemReference
-    {
-        public string Name { get; set; } = "Test Item";
-        public double Price { get; set; } = -1;
-        public bool isEnabled { get; set; } = false; //can this appear in this guild store?
     }
     public class Stock
     {
