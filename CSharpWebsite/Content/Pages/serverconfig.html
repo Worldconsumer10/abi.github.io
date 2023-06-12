@@ -199,6 +199,8 @@
             //new stuff
             LoadAllResponses(id)
             getChannels()
+            GetLogChannel()
+            GetLogLevel()
         }
         async function LoadAllResponses(id) {
             var response = await SendHTTPGet(`/getServerResponses?id=${id}`).catch((e) => { })
@@ -488,6 +490,18 @@
                 } catch (e) { console.error(e) }
             }
         }
+        async function GetLogChannel() {
+            var id = sessionStorage.getItem("serverTarget")
+            var response = await SendHTTPGet(`/getLogChannel?id=${id}`)
+            if (response.includes("[Success] "))
+                document.getElementById("botlogChannel").value=response.split("[Success] ")
+        }
+        async function GetLogLevel() {
+            var id = sessionStorage.getItem("serverTarget")
+            var response = await SendHTTPGet(`/getLogLevel?id=${id}`)
+            if (response.includes("[Success] "))
+                document.getElementById("botlogLevel").value = response.split("[Success] ")
+        }
         async function UpdateLogChannel(element) {
             console.log("Updating log channel")
             var tar = element.children[0].id;
@@ -520,7 +534,7 @@
             </select>
             <br />
             <label class="profileElement">Log Level: </label>
-            <select class="profileElement" onchange="UpdateLogLevel(this)" style="color: white; background: none; border: none;">
+            <select id="botlogLevel" class="profileElement" onchange="UpdateLogLevel(this)" style="color: white; background: none; border: none;">
                 <option style="color:black" title="Logs for when the program possibly crashed due to an error">Critical</option>
                 <option style="color:black" title="Logs for when the program failed to proccess something correctly">Error</option>
                 <option style="color:black" title="For potentially undesired items/content detected">Warning</option>

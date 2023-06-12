@@ -1,6 +1,7 @@
 ﻿using CSharpWebsite.Content.Database;
 using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
+using System.Collections.ObjectModel;
 
 namespace AnniUpdate.Database
 {
@@ -91,20 +92,50 @@ namespace AnniUpdate.Database
             return new TempAction { duration = new DateTime(long.Parse(durationTicks)).TimeOfDay, start = new DateTime(long.Parse(startTicks)), type = type, EndDate = new DateTime(long.Parse(EndDateTicks)), Id = ulong.Parse(Id) };
         }
     }
+    public sealed class StoreItemReference
+    {
+        public string Name { get; set; } = "Test Item";
+        public double Price { get; set; } = -1;
+        public bool isEnabled { get; set; } = false; //can this appear in this guild store?
+    }
+    public class InventoryItem
+    {
+        public StoreItemReference reference { get; set; }
+        public double count { get; set; }
+    }
     [BsonIgnoreExtraElements]
     public class GuildUser
     {
         [BsonId]
         public ulong ID { get; set; }
+        [BsonRequired]
         public string Name { get; set; } = "Test User";
+        public List<BadgeReference> badges { get; set; } = new List<BadgeReference>();
+        [BsonRequired]
         public double Level { get; set; } = 1;
+        [BsonRequired]
         public double XP { get; set; } = 0;
+        [BsonRequired]
         public List<Earnings> Wallet { get; set; } = new List<Earnings>();
+        [BsonRequired]
         public double Bank { get; set; } = 0;
         public string fakeBSB { get; set; } = CreateBSB();
         public int fakeAccNum { get; set; } = new Random().Next(0, int.MaxValue);
         public bool rudeAnni { get; set; } = false;
         public double Bounty { get; set; } = 0;
+        public string? steamID { get; set; } = null;
+        public List<DetLog> detLogs { get; set; } = new List<DetLog>();
+        public List<TempActionReference> tempReferences { get; set; } = new List<TempActionReference>();
+        [BsonElement("inventory")]
+        private List<InventoryItem> _inventory { get; set; } = new List<InventoryItem>();
+        [BsonIgnore]
+        public ReadOnlyCollection<InventoryItem> inventory
+        {
+            get
+            {
+                return _inventory.AsReadOnly();
+            }
+        }
         public GuildUser(ulong iD, string name, double level, double xP, List<Earnings> wallet, double bank, string fakeBSB, int fakeAccNum, bool rudeAnni, double bounty)
         {
             ID = iD;

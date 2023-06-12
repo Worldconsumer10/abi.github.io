@@ -515,6 +515,18 @@ app.MapGet("/getServerChannels", async (HttpContext context, string id) =>
     if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
     await ContextResponse.RespondAsync(context.Response, "[Success] " + JsonConvert.SerializeObject(server.channels)); return;
 });
+app.MapGet("/getLogChannel", async (HttpContext context, string id) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + server.logChannel); return;
+});
+app.MapGet("/getLogLevel", async (HttpContext context, string id) =>
+{
+    var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
+    if (server == null) { await ContextResponse.RespondAsync(context.Response, "[Failure] (Invalid Server ID)"); return; }
+    await ContextResponse.RespondAsync(context.Response, "[Success] " + server.logLevel); return;
+});
 app.MapGet("/setLogChannel", async (HttpContext context, string id,string channelid) =>
 {
     var server = await GuildServer.Get(ulong.Parse(string.Join(string.Empty, id.Where(i => char.IsNumber(i)))));
