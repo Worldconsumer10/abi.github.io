@@ -171,7 +171,7 @@ namespace AnniUpdate.Database
             Name = name ?? throw new ArgumentNullException(nameof(name));
             Level = level;
             XP = xP;
-            Wallet = wallet ?? throw new ArgumentNullException(nameof(wallet));
+            _wallet = wallet;
             Bank = bank;
             this.fakeBSB = fakeBSB ?? throw new ArgumentNullException(nameof(fakeBSB));
             this.fakeAccNum = fakeAccNum;
