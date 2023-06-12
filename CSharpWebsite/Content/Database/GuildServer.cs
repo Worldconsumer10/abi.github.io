@@ -47,10 +47,6 @@ namespace AnniUpdate.Database
         public List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>> TempBans { get; set; } = new List<Tuple<ulong, DateTime, Tuple<int, int, int, int, int, int>>>();
         public double Inflation { get; set; } = 0;
         public LogSeverity logLevel { get; set; } = LogSeverity.Info;
-        public bool canPrintLog(LogSeverity severity)
-        {
-            return (ulong)severity <= (ulong)logLevel;
-        }
         public string serverPrefix { get; set; } = "a!";
         public ulong? logChannel { get; set; } = null;
         public List<Tuple<string, ulong>> channels { get; set; } = new List<Tuple<string, ulong>>();

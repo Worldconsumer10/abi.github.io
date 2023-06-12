@@ -103,6 +103,15 @@ namespace AnniUpdate.Database
         public StoreItemReference reference { get; set; }
         public double count { get; set; }
     }
+    public class DailyTaskReference
+    {
+        public string task { get; set; }
+        public int count { get; set; }
+    }
+    public sealed class UserJobReference
+    {
+        public string Name { get; set; }
+    }
     [BsonIgnoreExtraElements]
     public class GuildUser
     {
@@ -115,10 +124,28 @@ namespace AnniUpdate.Database
         public double Level { get; set; } = 1;
         [BsonRequired]
         public double XP { get; set; } = 0;
-        [BsonRequired]
-        public List<Earnings> Wallet { get; set; } = new List<Earnings>();
+        [BsonElement("Wallet")]
+        private List<Earnings> _wallet { get; set; } = new List<Earnings>();
+        [BsonIgnore]
+        public ReadOnlyCollection<Earnings> Wallet
+        {
+            get
+            {
+                return _wallet.AsReadOnly();
+            }
+        }
         [BsonRequired]
         public double Bank { get; set; } = 0;
+        [BsonElement("Stamina")]
+        private int _stamina = 100;
+        [BsonIgnore]
+        public int stamina
+        {
+            get
+            {
+                return _stamina;
+            }
+        }
         public string fakeBSB { get; set; } = CreateBSB();
         public int fakeAccNum { get; set; } = new Random().Next(0, int.MaxValue);
         public bool rudeAnni { get; set; } = false;
@@ -126,8 +153,10 @@ namespace AnniUpdate.Database
         public string? steamID { get; set; } = null;
         public List<DetLog> detLogs { get; set; } = new List<DetLog>();
         public List<TempActionReference> tempReferences { get; set; } = new List<TempActionReference>();
+        public List<DailyTaskReference> dailyTasks { get; set; } = new List<DailyTaskReference>();
         [BsonElement("inventory")]
         private List<InventoryItem> _inventory { get; set; } = new List<InventoryItem>();
+        public UserJobReference? jobReference { get; set; }
         [BsonIgnore]
         public ReadOnlyCollection<InventoryItem> inventory
         {
